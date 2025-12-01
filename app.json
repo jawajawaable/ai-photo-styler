@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "ai_photo_styler",
+    "slug": "ai_photo_styler",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryAddUsageDescription": "Bu uygulama oluşturulan fotoğrafları galerinize kaydetmek için erişim izni gerektirir."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Bu uygulama oluşturulan fotoğrafları galerinize kaydetmek için erişim izni gerektirir.",
+          "saveToPhotosPermission": "Bu uygulama oluşturulan fotoğrafları galerinize kaydetmek için erişim izni gerektirir."
+        }
+      ]
+    ]
+  }
+}
