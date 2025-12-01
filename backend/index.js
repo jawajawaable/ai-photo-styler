@@ -121,10 +121,12 @@ app.post('/api/generate-style', async (req, res) => {
                         .getPublicUrl(`outputs/${id}.png`);
 
                     // 5. Deduct Credit
-                    const { error: deductError } = await supabase
+                    console.log(`Attempting to deduct credit for user ${userId}. Current credits: ${profile.credits}`);
+                    const { data: updateData, error: deductError } = await supabase
                         .from('profiles')
                         .update({ credits: profile.credits - 1 })
-                        .eq('id', userId);
+                        .eq('id', userId)
+                        .select();
 
                     if (deductError) {
                         console.error('Credit deduction failed:', deductError);
@@ -135,6 +137,8 @@ app.post('/api/generate-style', async (req, res) => {
                             description: 'Görsel oluşturuldu ancak kredi düşülemedi. (Hata: ' + deductError.message + ')'
                         });
                     }
+
+                    console.log('Credit deduction successful:', updateData);
 
                     return res.json({
                         type: 'image',

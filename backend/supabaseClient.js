@@ -9,6 +9,8 @@ if (!supabaseUrl || !supabaseKey) {
     console.warn('Supabase URL or Key is missing. Database features will not work.');
 }
 
+console.log('Using Supabase key type:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SERVICE_ROLE' : 'ANON');
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 module.exports = supabase;
