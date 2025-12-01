@@ -1,35 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { Text, Surface, Icon, useTheme, Button } from 'react-native-paper';
+import { Text, Surface, Icon, useTheme } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabaseClient';
 
 const { width } = Dimensions.get('window');
 
-export default function HomeScreen({ onImageSelected, userId }) {
+export default function HomeScreen({ onImageSelected, credits, onProfilePress }) {
     const theme = useTheme();
-    const [credits, setCredits] = useState(null);
-
-    useEffect(() => {
-        fetchCredits();
-    }, []);
-
-    const fetchCredits = async () => {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('credits')
-            .eq('id', userId)
-            .single();
-
-        if (data) {
-            setCredits(data.credits);
-        }
-    };
-
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
-    };
 
     const pickImage = async () => {
         let result = await ImagePicker.launchImageLibraryAsync({
@@ -59,8 +38,8 @@ export default function HomeScreen({ onImageSelected, userId }) {
                             <Icon source="star" size={16} color="#fbbf24" />
                             <Text style={styles.creditText}>{credits !== null ? credits : '-'} Kredi</Text>
                         </Surface>
-                        <TouchableOpacity onPress={handleLogout}>
-                            <Icon source="logout" size={24} color={theme.colors.error} />
+                        <TouchableOpacity onPress={onProfilePress}>
+                            <Icon source="account-circle" size={32} color={theme.colors.primary} />
                         </TouchableOpacity>
                     </View>
                 </View>

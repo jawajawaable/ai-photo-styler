@@ -115,24 +115,32 @@ app.post('/api/generate-style', async (req, res) => {
                         });
                     }
 
-                    // 4. Deduct Credit
+                    // 4. Get Public URL
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('images')
+                        .getPublicUrl(`outputs/${id}.png`);
+
+                    // 5. Deduct Credit
                     const { error: deductError } = await supabase
                         .from('profiles')
                         .update({ credits: profile.credits - 1 })
                         .eq('id', userId);
 
-                    if (deductError) console.error('Credit deduction failed:', deductError);
-
-                    // 5. Get Public URL
-                    const { data: { publicUrl } } = supabase.storage
-                        .from('images')
-                        .getPublicUrl(`outputs/${id}.png`);
+                    if (deductError) {
+                        console.error('Credit deduction failed:', deductError);
+                        return res.json({
+                            type: 'image',
+                            url: publicUrl,
+                            data: outputBase64,
+                            description: 'Görsel oluşturuldu ancak kredi düşülemedi. (Hata: ' + deductError.message + ')'
+                        });
+                    }
 
                     return res.json({
                         type: 'image',
                         url: publicUrl,
-                        data: outputBase64, // Keep sending base64 for immediate display if needed, or remove to save bandwidth
-                        description: 'Görsel başarıyla oluşturuldu ve kaydedildi.'
+                        data: outputBase64,
+                        description: 'Görsel başarıyla oluşturuldu. Kalan Kredi: ' + (profile.credits - 1)
                     });
                 }
             }
