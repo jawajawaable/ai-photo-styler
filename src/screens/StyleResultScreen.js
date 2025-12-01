@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Image, ScrollView, Alert, Linking, TouchableOpacity } from 'react-native';
-import { Button, Text, ActivityIndicator, IconButton, Surface, useTheme } from 'react-native-paper';
+import { Button, Text, ActivityIndicator, IconButton, Surface, useTheme, Icon } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { generateStyledImage } from '../services/geminiService';
 import * as MediaLibrary from 'expo-media-library';
@@ -83,7 +83,7 @@ The background consists of a large banner primarily in red and gold, featuring a
     }
 ];
 
-export default function StyleResultScreen({ imageUri, imageBase64, onBack }) {
+export default function StyleResultScreen({ imageUri, imageBase64, onBack, userId }) {
     const [selectedStyle, setSelectedStyle] = useState(null);
     const [loading, setLoading] = useState(false);
     const [resultImage, setResultImage] = useState(null);
@@ -131,7 +131,7 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack }) {
 
         setLoading(true);
         try {
-            const result = await generateStyledImage(imageBase64, selectedStyle.promptModifier);
+            const result = await generateStyledImage(imageBase64, selectedStyle.promptModifier, userId);
 
             if (result.type === 'image') {
                 const newImageUri = `data:image/png;base64,${result.data}`;

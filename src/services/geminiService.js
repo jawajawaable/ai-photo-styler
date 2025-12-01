@@ -2,9 +2,9 @@
 // For Android Emulator: http://10.0.2.2:3000
 // For iOS Simulator: http://localhost:3000
 // For Physical Device: Use your computer's local IP (e.g., http://192.168.1.x:3000) or ngrok URL
-const API_URL = 'https://ai-photo-styler-wdvh.onrender.com/api/generate-style';
+const API_URL = 'https://ai-photo-styler-1-hozn.onrender.com/api/generate-style';
 
-export const generateStyledImage = async (base64Image, styleDescription) => {
+export const generateStyledImage = async (base64Image, styleDescription, userId) => {
     try {
         console.log('Backend API çağrılıyor:', API_URL);
 
@@ -17,6 +17,7 @@ export const generateStyledImage = async (base64Image, styleDescription) => {
             body: JSON.stringify({
                 image: base64Image,
                 prompt: styleDescription,
+                userId: userId,
             }),
         });
 

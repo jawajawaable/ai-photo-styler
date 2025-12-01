@@ -24,13 +24,29 @@ const supabase = require('./supabaseClient');
 
 app.post('/api/generate-style', async (req, res) => {
     try {
-        const { image, prompt } = req.body;
+        const { image, prompt, userId } = req.body;
 
-        if (!image || !prompt) {
-            return res.status(400).json({ error: 'Image and prompt are required' });
+        if (!image || !prompt || !userId) {
+            return res.status(400).json({ error: 'Image, prompt, and userId are required' });
         }
 
-        console.log('Processing style generation request...');
+        // 0. Check Credits
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('credits')
+            .eq('id', userId)
+            .single();
+
+        if (profileError) {
+            console.error('Profile Fetch Error:', profileError);
+            return res.status(500).json({ error: 'Kullanıcı profili alınamadı.' });
+        }
+
+        if (profile.credits < 1) {
+            return res.status(403).json({ error: 'Yetersiz kredi! Lütfen kredi yükleyin.' });
+        }
+
+        console.log(`Processing style generation request for user ${userId} (Credits: ${profile.credits})...`);
 
         // Clean base64 string
         const cleanBase64 = image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
@@ -99,7 +115,15 @@ app.post('/api/generate-style', async (req, res) => {
                         });
                     }
 
-                    // 4. Get Public URL
+                    // 4. Deduct Credit
+                    const { error: deductError } = await supabase
+                        .from('profiles')
+                        .update({ credits: profile.credits - 1 })
+                        .eq('id', userId);
+
+                    if (deductError) console.error('Credit deduction failed:', deductError);
+
+                    // 5. Get Public URL
                     const { data: { publicUrl } } = supabase.storage
                         .from('images')
                         .getPublicUrl(`outputs/${id}.png`);
