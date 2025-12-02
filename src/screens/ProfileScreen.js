@@ -4,7 +4,7 @@ import { Text, Surface, Button, Divider, useTheme, Icon } from 'react-native-pap
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabaseClient';
 
-export default function ProfileScreen({ userId, onBack }) {
+export default function ProfileScreen({ userId, onBack, onAdminPress }) {
     const theme = useTheme();
     const [profile, setProfile] = useState(null);
     const [email, setEmail] = useState('');
@@ -83,6 +83,17 @@ export default function ProfileScreen({ userId, onBack }) {
                         </View>
                     </View>
                 </Surface>
+
+                {email === 'anilerdogduu@gmail.com' && (
+                    <Button
+                        mode="contained"
+                        onPress={onAdminPress}
+                        style={styles.adminButton}
+                        icon="shield-crown"
+                    >
+                        Admin Panel
+                    </Button>
+                )}
 
                 <Button
                     mode="outlined"
@@ -176,6 +187,9 @@ const styles = StyleSheet.create({
     },
     detailValue: {
         fontWeight: '500',
+    },
+    adminButton: {
+        marginTop: 16,
     },
     logoutButton: {
         marginTop: 16,

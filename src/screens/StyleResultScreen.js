@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Image, ScrollView, Alert, Linking, TouchableOpacity } from 'react-native';
 import { Button, Text, ActivityIndicator, IconButton, Surface, useTheme, Icon } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { generateStyledImage } from '../services/geminiService';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
+
+const API_URL = 'https://ai-photo-styler-1-hozn.onrender.com';
 
 const STYLES = [
     {
@@ -87,7 +89,34 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
     const [selectedStyle, setSelectedStyle] = useState(null);
     const [loading, setLoading] = useState(false);
     const [resultImage, setResultImage] = useState(null);
+    const [styles, setStyles] = useState(STYLES); // Start with hardcoded, will be replaced
     const theme = useTheme();
+
+    useEffect(() => {
+        fetchStyles();
+    }, []);
+
+    const fetchStyles = async () => {
+        try {
+            const response = await fetch(`${API_URL}/api/styles`);
+            const data = await response.json();
+            if (response.ok && data.styles) {
+                // Convert database format to component format
+                const formattedStyles = data.styles.map(s => ({
+                    id: s.style_id,
+                    name: s.name,
+                    description: s.description,
+                    promptModifier: s.prompt_modifier,
+                    icon: s.icon,
+                    color: s.color
+                }));
+                setStyles(formattedStyles);
+            }
+        } catch (error) {
+            console.log('Using hardcoded styles, API fetch failed:', error);
+            // Keep using STYLES if API fails
+        }
+    };
 
     const handleSave = async () => {
         if (!resultImage) return;
@@ -179,7 +208,7 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
                 <View style={styles.styleSection}>
                     <Text variant="titleMedium" style={styles.sectionTitle}>Bir Stil Seçin</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.styleList}>
-                        {STYLES.map((style) => {
+                        {styles.map((style) => {
                             const isSelected = selectedStyle?.id === style.id;
                             return (
                                 <TouchableOpacity

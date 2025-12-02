@@ -6,6 +6,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import StyleResultScreen from './src/screens/StyleResultScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import AdminScreen from './src/screens/AdminScreen';
 import { supabase } from './src/services/supabaseClient';
 
 const theme = {
@@ -64,6 +65,10 @@ export default function App() {
     setCurrentScreen('profile');
   };
 
+  const navigateToAdmin = () => {
+    setCurrentScreen('admin');
+  };
+
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
@@ -78,6 +83,12 @@ export default function App() {
           />
         ) : currentScreen === 'profile' ? (
           <ProfileScreen
+            userId={session.user.id}
+            onBack={navigateHome}
+            onAdminPress={navigateToAdmin}
+          />
+        ) : currentScreen === 'admin' ? (
+          <AdminScreen
             userId={session.user.id}
             onBack={navigateHome}
           />

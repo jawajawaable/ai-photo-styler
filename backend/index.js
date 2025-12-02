@@ -164,6 +164,122 @@ app.post('/api/generate-style', async (req, res) => {
     }
 });
 
+// Get all active styles
+app.get('/api/styles', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('styles')
+            .select('*')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+        res.json({ styles: data });
+    } catch (error) {
+        console.error('Error fetching styles:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin email constant
+const ADMIN_EMAIL = 'anilerdogduu@gmail.com';
+
+// Get all styles (admin only)
+app.post('/api/admin/styles', async (req, res) => {
+    try {
+        const { userId } = req.body;
+
+        // Check admin
+        const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+        if (!user || user.email !== ADMIN_EMAIL) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const { data, error } = await supabase
+            .from('styles')
+            .select('*')
+            .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+        res.json({ styles: data });
+    } catch (error) {
+        console.error('Error fetching admin styles:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create style (admin only)
+app.post('/api/admin/styles/create', async (req, res) => {
+    try {
+        const { userId, style } = req.body;
+
+        const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+        if (!user || user.email !== ADMIN_EMAIL) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const { data, error } = await supabase
+            .from('styles')
+            .insert([style])
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json({ style: data });
+    } catch (error) {
+        console.error('Error creating style:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update style (admin only)
+app.post('/api/admin/styles/update', async (req, res) => {
+    try {
+        const { userId, styleId, updates } = req.body;
+
+        const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+        if (!user || user.email !== ADMIN_EMAIL) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const { data, error } = await supabase
+            .from('styles')
+            .update(updates)
+            .eq('id', styleId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json({ style: data });
+    } catch (error) {
+        console.error('Error updating style:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete style (admin only)
+app.post('/api/admin/styles/delete', async (req, res) => {
+    try {
+        const { userId, styleId } = req.body;
+
+        const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+        if (!user || user.email !== ADMIN_EMAIL) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const { error } = await supabase
+            .from('styles')
+            .delete()
+            .eq('id', styleId);
+
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting style:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Backend server running on http://localhost:${port}`);
 });

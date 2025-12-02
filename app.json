@@ -28,6 +28,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "scheme": "aiphotostyler",
     "plugins": [
       [
         "expo-media-library",
