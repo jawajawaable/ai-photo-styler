@@ -19,7 +19,8 @@ const STYLES = [
     { id: 'devrimci', name: 'Devrimci', description: 'İkonik, siyah-beyaz ve karizmatik devrimci poster estetiği.', promptModifier: 'A powerful and iconic revolutionary portrait shot with a 40–50 mm lens.', icon: '⭐', color: '#44403c' },
     { id: 'anime', name: 'Anime', description: 'Canlı renkler ve keskin hatlarla Japon animasyon stili.', promptModifier: 'anime style, cel shaded, vibrant, japanese animation, studio ghibli inspired, detailed line work', icon: '✨', color: '#3b82f6' },
     { id: 'arabesk', name: 'Arabesk', description: "90'lar arabesk albüm kapağı estetiği.", promptModifier: "A hyper-kitsch 90's Turkish arabesk album cover, extremely dramatic and over-the-top.", icon: '🎤', color: '#7e22ce' },
-    { id: 'tattoo', name: 'Dövme', description: 'Gerçekçi kol dövmesi simülasyonu.', promptModifier: 'Generate a photorealistic image of a man with his upper arm clearly visible in the frame.', icon: '💪', color: '#57534e' }
+    { id: 'tattoo', name: 'Dövme', description: 'Gerçekçi kol dövmesi simülasyonu.', promptModifier: 'Generate a photorealistic image of a man with his upper arm clearly visible in the frame.', icon: '💪', color: '#57534e' },
+    { id: 'dugun', name: 'Düğün', description: 'İki kişilik düğün fotoğrafı.', promptModifier: 'Ultra-realistic, highly detailed, close-up cinematic portrait of a groom in a grey suit and a bride in a lace wedding dress, shaking hands. light blue, cloudy, and moody background. Dramatic studio lighting. Photorealistic. (Gri takım elbiseli bir damat ve dantelli gelinlikli bir gelinin el sıkıştığı ultra gerçekçi, çok detaylı, yakın çekim sinematik portresi. açık mavi mavi, bulutlu ve karamsar arka plan. Dramatik stüdyo aydınlatması. Foto-gerçekçi.)', icon: '💑', color: '#ec4899', requiresTwoPhotos: true }
 ];
 
 export default function StyleResultScreen({ imageUri, imageBase64, onBack, userId, credits, onCreditsUpdate }) {
@@ -148,9 +149,17 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
                     <IconButton icon="arrow-left" size={24} iconColor="#000" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Editör</Text>
-                <View style={styles.creditsBadge}>
-                    <Text style={styles.creditsIcon}>⭐</Text>
-                    <Text style={styles.creditsValue}>{credits || 0}</Text>
+                <View style={styles.headerRight}>
+                    {resultImage ? (
+                        <TouchableOpacity onPress={handleSave}>
+                            <Text style={styles.saveButton}>Kaydet</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={styles.creditsBadge}>
+                            <Text style={styles.creditsIcon}>⭐</Text>
+                            <Text style={styles.creditsValue}>{credits || 0}</Text>
+                        </View>
+                    )}
                 </View>
             </SafeAreaView>
 
@@ -247,6 +256,16 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#000',
         textAlign: 'center',
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    saveButton: {
+        color: '#0095f6',
+        fontWeight: '600',
+        fontSize: 16,
+        marginRight: 8,
     },
     creditsBadge: {
         flexDirection: 'row',

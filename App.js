@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Provider as PaperProvider, MD3LightTheme } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import HomeScreen from './src/screens/HomeScreen';
 import StyleResultScreen from './src/screens/StyleResultScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AdminScreen from './src/screens/AdminScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 import { supabase } from './src/services/supabaseClient';
 
 const theme = {
@@ -18,13 +20,18 @@ const theme = {
   },
 };
 
+const ONBOARDING_KEY = '@satrayni_onboarding_complete';
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [selectedImage, setSelectedImage] = useState(null);
   const [session, setSession] = useState(null);
   const [credits, setCredits] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(null);
 
   useEffect(() => {
+    checkOnboarding();
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) fetchCredits(session.user.id);
@@ -35,6 +42,15 @@ export default function App() {
       if (session) fetchCredits(session.user.id);
     });
   }, []);
+
+  const checkOnboarding = async () => {
+    const hasSeenOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
+    setShowOnboarding(hasSeenOnboarding !== 'true');
+  };
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
 
   const fetchCredits = async (userId) => {
     if (!userId) return;
@@ -76,7 +92,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
-        {!session ? (
+        {showOnboarding === null ? null : showOnboarding ? (
+          <OnboardingScreen onComplete={handleOnboardingComplete} />
+        ) : !session ? (
           <AuthScreen />
         ) : currentScreen === 'home' ? (
           <HomeScreen

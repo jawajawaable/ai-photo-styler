@@ -47,7 +47,10 @@ export const generateStyledImage = async (base64Image, styleDescription, userId,
         }
 
     } catch (error) {
-        console.error('Service Error:', error);
+        // Only log unexpected errors
+        if (error.message !== 'Yetersiz kredi! Lütfen kredi yükleyin.') {
+            console.error('Service Error:', error);
+        }
         throw error;
     }
 };

@@ -9,6 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.1.0",
     "@fal-ai/client": "^1.7.2",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.86.0",
