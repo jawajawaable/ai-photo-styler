@@ -89,7 +89,7 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
     const [selectedStyle, setSelectedStyle] = useState(null);
     const [loading, setLoading] = useState(false);
     const [resultImage, setResultImage] = useState(null);
-    const [styles, setStyles] = useState(STYLES); // Start with hardcoded, will be replaced
+    const [availableStyles, setAvailableStyles] = useState(STYLES); // Start with hardcoded, will be replaced
     const theme = useTheme();
 
     useEffect(() => {
@@ -110,7 +110,7 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
                     icon: s.icon,
                     color: s.color
                 }));
-                setStyles(formattedStyles);
+                setAvailableStyles(formattedStyles);
             }
         } catch (error) {
             console.log('Using hardcoded styles, API fetch failed:', error);
@@ -208,7 +208,7 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
                 <View style={styles.styleSection}>
                     <Text variant="titleMedium" style={styles.sectionTitle}>Bir Stil Seçin</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.styleList}>
-                        {styles.map((style) => {
+                        {availableStyles.map((style) => {
                             const isSelected = selectedStyle?.id === style.id;
                             return (
                                 <TouchableOpacity
