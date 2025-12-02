@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_URL = 'https://ai-photo-styler-1-hozn.onrender.com';
 
-export default function AdminScreen({ userId, onBack }) {
+export default function AdminScreen({ userId, onBack, credits }) {
     const theme = useTheme();
     const [styles, setStyles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -134,7 +134,10 @@ export default function AdminScreen({ userId, onBack }) {
                     Geri
                 </Button>
                 <Text variant="headlineMedium" style={styles.title}>Admin Panel</Text>
-                <View style={{ width: 80 }} />
+                <View style={styles.creditsBadge}>
+                    <Text style={styles.creditsIcon}>⭐</Text>
+                    <Text style={styles.creditsValue}>{credits || 0}</Text>
+                </View>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
@@ -289,5 +292,22 @@ const styles = StyleSheet.create({
     styleActions: {
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    creditsBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f0f0f0',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    creditsIcon: {
+        fontSize: 16,
+        marginRight: 4,
+    },
+    creditsValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#000',
     },
 });

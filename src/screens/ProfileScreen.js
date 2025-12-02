@@ -4,7 +4,7 @@ import { Text, Surface, Button, Divider, useTheme, Icon } from 'react-native-pap
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabaseClient';
 
-export default function ProfileScreen({ userId, onBack, onAdminPress }) {
+export default function ProfileScreen({ userId, onBack, onAdminPress, credits }) {
     const theme = useTheme();
     const [profile, setProfile] = useState(null);
     const [email, setEmail] = useState('');
@@ -44,7 +44,10 @@ export default function ProfileScreen({ userId, onBack, onAdminPress }) {
                     Geri
                 </Button>
                 <Text variant="headlineMedium" style={styles.title}>Profilim</Text>
-                <View style={{ width: 80 }} />
+                <View style={styles.creditsBadge}>
+                    <Text style={styles.creditsIcon}>⭐</Text>
+                    <Text style={styles.creditsValue}>{credits || 0}</Text>
+                </View>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
@@ -194,5 +197,22 @@ const styles = StyleSheet.create({
     logoutButton: {
         marginTop: 16,
         borderColor: '#ef4444',
+    },
+    creditsBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f0f0f0',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    creditsIcon: {
+        fontSize: 16,
+        marginRight: 4,
+    },
+    creditsValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#000',
     },
 });

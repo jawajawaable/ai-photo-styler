@@ -38,6 +38,7 @@ export default function App() {
 
   const fetchCredits = async (userId) => {
     if (!userId) return;
+    console.log('Fetching credits for user:', userId); // Debug
     const { data, error } = await supabase
       .from('profiles')
       .select('credits')
@@ -45,7 +46,10 @@ export default function App() {
       .single();
 
     if (data) {
+      console.log('Credits loaded:', data.credits); // Debug
       setCredits(data.credits);
+    } else if (error) {
+      console.error('Error fetching credits:', error); // Debug
     }
   };
 
@@ -86,11 +90,13 @@ export default function App() {
             userId={session.user.id}
             onBack={navigateHome}
             onAdminPress={navigateToAdmin}
+            credits={credits}
           />
         ) : currentScreen === 'admin' ? (
           <AdminScreen
             userId={session.user.id}
             onBack={navigateHome}
+            credits={credits}
           />
         ) : (
           <StyleResultScreen
@@ -98,6 +104,8 @@ export default function App() {
             imageBase64={selectedImage?.base64}
             onBack={navigateHome}
             userId={session.user.id}
+            credits={credits}
+            onCreditsUpdate={() => session && fetchCredits(session.user.id)}
           />
         )}
         <StatusBar style="auto" />

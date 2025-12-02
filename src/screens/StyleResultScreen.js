@@ -21,7 +21,7 @@ const STYLES = [
     { id: 'tattoo', name: 'Dövme', description: 'Gerçekçi kol dövmesi simülasyonu.', promptModifier: 'Generate a photorealistic image of a man with his upper arm clearly visible in the frame.', icon: '💪', color: '#57534e' }
 ];
 
-export default function StyleResultScreen({ imageUri, imageBase64, onBack, userId }) {
+export default function StyleResultScreen({ imageUri, imageBase64, onBack, userId, credits, onCreditsUpdate }) {
     const [selectedStyle, setSelectedStyle] = useState(null);
     const [loading, setLoading] = useState(false);
     const [resultImage, setResultImage] = useState(null);
@@ -78,14 +78,19 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
         }
     };
 
-    const handleApplyStyle = async () => {
-        if (!selectedStyle || !imageBase64) return;
+    const handleApplyStyle = async (style) => {
+        if (!style || !imageBase64) return;
 
         setLoading(true);
+        setSelectedStyle(style);
         try {
-            const result = await generateStyledImage(imageBase64, selectedStyle.promptModifier, userId);
+            const result = await generateStyledImage(imageBase64, style.promptModifier, userId);
             if (result.type === 'image') {
                 setResultImage(`data:image/png;base64,${result.data}`);
+                // Refresh credits after successful generation
+                if (onCreditsUpdate) {
+                    onCreditsUpdate();
+                }
             }
         } catch (error) {
             Alert.alert('Hata', error.message);
@@ -98,13 +103,14 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
         <View style={styles.container}>
             {/* Header */}
             <SafeAreaView edges={['top']} style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.headerButton}>
+                <TouchableOpacity onPress={onBack} style={styles.backButton}>
                     <IconButton icon="arrow-left" size={24} iconColor="#000" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Editör</Text>
-                <TouchableOpacity onPress={handleSave} style={styles.headerButton}>
-                    <Text style={styles.saveButton}>Kaydet</Text>
-                </TouchableOpacity>
+                <View style={styles.creditsBadge}>
+                    <Text style={styles.creditsIcon}>⭐</Text>
+                    <Text style={styles.creditsValue}>{credits || 0}</Text>
+                </View>
             </SafeAreaView>
 
             {/* Image Preview */}
@@ -145,10 +151,7 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
                             return (
                                 <TouchableOpacity
                                     key={style.id}
-                                    onPress={() => {
-                                        setSelectedStyle(style);
-                                        handleApplyStyle();
-                                    }}
+                                    onPress={() => handleApplyStyle(style)}
                                     style={styles.styleItem}
                                 >
                                     <View style={[
@@ -180,24 +183,38 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         backgroundColor: '#fff',
         borderBottomWidth: 0.5,
         borderBottomColor: '#e0e0e0',
     },
-    headerButton: {
-        width: 80,
+    backButton: {
+        marginRight: 8,
     },
     headerTitle: {
+        flex: 1,
         fontSize: 18,
         fontWeight: '600',
         color: '#000',
+        textAlign: 'center',
     },
-    saveButton: {
+    creditsBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f0f0f0',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    creditsIcon: {
         fontSize: 16,
-        fontWeight: '600',
-        color: '#0095f6',
-        textAlign: 'right',
+        marginRight: 4,
+    },
+    creditsValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#000',
     },
     imageContainer: {
         flex: 1,
