@@ -135,6 +135,7 @@ export default function App() {
             userId={session.user.id}
             credits={credits}
             onCreditsUpdate={() => session && fetchCredits(session.user.id)}
+            onPurchasePress={navigateToPurchase}
           />
         )}
         <StatusBar style="auto" />

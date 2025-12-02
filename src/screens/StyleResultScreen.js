@@ -23,7 +23,7 @@ const STYLES = [
     { id: 'dugun', name: 'Düğün', description: 'İki kişilik düğün fotoğrafı.', promptModifier: 'Ultra-realistic, highly detailed, close-up cinematic portrait of a groom in a grey suit and a bride in a lace wedding dress, shaking hands. light blue, cloudy, and moody background. Dramatic studio lighting. Photorealistic. (Gri takım elbiseli bir damat ve dantelli gelinlikli bir gelinin el sıkıştığı ultra gerçekçi, çok detaylı, yakın çekim sinematik portresi. açık mavi mavi, bulutlu ve karamsar arka plan. Dramatik stüdyo aydınlatması. Foto-gerçekçi.)', icon: '💑', color: '#ec4899', requiresTwoPhotos: true }
 ];
 
-export default function StyleResultScreen({ imageUri, imageBase64, onBack, userId, credits, onCreditsUpdate }) {
+export default function StyleResultScreen({ imageUri, imageBase64, onBack, userId, credits, onCreditsUpdate, onPurchasePress }) {
     const [selectedStyle, setSelectedStyle] = useState(null);
     const [loading, setLoading] = useState(false);
     const [resultImage, setResultImage] = useState(null);
@@ -135,7 +135,26 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
                 }
             }
         } catch (error) {
-            Alert.alert('Hata', error.message);
+            // Check if it's a credit error
+            if (error.message.includes('Yetersiz kredi')) {
+                Alert.alert(
+                    'Yetersiz Kredi',
+                    'Stil uygulamak için krediniz yeterli değil. Kredi almak ister misiniz?',
+                    [
+                        { text: 'İptal', style: 'cancel' },
+                        {
+                            text: 'Kredi Al',
+                            onPress: () => {
+                                if (onPurchasePress) {
+                                    onPurchasePress();
+                                }
+                            }
+                        }
+                    ]
+                );
+            } else {
+                Alert.alert('Hata', error.message);
+            }
         } finally {
             setLoading(false);
         }
