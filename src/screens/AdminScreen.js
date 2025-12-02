@@ -21,6 +21,10 @@ export default function AdminScreen({ userId, onBack, credits }) {
         sort_order: 0
     });
 
+    // Credit management state
+    const [creditUserEmail, setCreditUserEmail] = useState('');
+    const [creditAmount, setCreditAmount] = useState('10');
+
     useEffect(() => {
         fetchStyles();
     }, []);
@@ -127,6 +131,37 @@ export default function AdminScreen({ userId, onBack, credits }) {
         );
     };
 
+    const handleAddCredits = async () => {
+        if (!creditUserEmail || !creditAmount) {
+            Alert.alert('Hata', 'Lütfen kullanıcı email ve kredi miktarı girin');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/api/admin/add-credits`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId,
+                    userEmail: creditUserEmail,
+                    credits: parseInt(creditAmount)
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                Alert.alert('Başarılı!', `${creditAmount} kredi ${creditUserEmail} adresine eklendi.\nYeni toplam: ${data.new_total}`);
+                setCreditUserEmail('');
+                setCreditAmount('10');
+            } else {
+                Alert.alert('Hata', data.error || 'İşlem başarısız');
+            }
+        } catch (error) {
+            Alert.alert('Hata', error.message);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
@@ -225,6 +260,55 @@ export default function AdminScreen({ userId, onBack, credits }) {
                         <Text variant="bodySmall" numberOfLines={2}>{style.description}</Text>
                     </Surface>
                 ))}
+
+                {/* Credit Management Section */}
+                <Surface style={[styles.card, { marginTop: 24 }]} elevation={2}>
+                    <Text variant="titleLarge" style={styles.sectionTitle}>💰 Kredi Yönetimi</Text>
+                    <Text variant="bodySmall" style={{ marginBottom: 16, color: '#666' }}>
+                        Kullanıcılara manuel kredi ekleyin (Test amaçlı)
+                    </Text>
+
+                    <TextInput
+                        label="Kullanıcı Email"
+                        value={creditUserEmail}
+                        onChangeText={setCreditUserEmail}
+                        mode="outlined"
+                        keyboardType="email-address"
+                        style={styles.input}
+                        placeholder="ornek@email.com"
+                    />
+
+                    <TextInput
+                        label="Kredi Miktarı"
+                        value={creditAmount}
+                        onChangeText={setCreditAmount}
+                        mode="outlined"
+                        keyboardType="numeric"
+                        style={styles.input}
+                    />
+
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                        {['10', '50', '100', '500'].map(amount => (
+                            <Button
+                                key={amount}
+                                mode={creditAmount === amount ? 'contained' : 'outlined'}
+                                onPress={() => setCreditAmount(amount)}
+                                style={{ flex: 1 }}
+                            >
+                                {amount}
+                            </Button>
+                        ))}
+                    </View>
+
+                    <Button
+                        mode="contained"
+                        onPress={handleAddCredits}
+                        style={{ marginTop: 16 }}
+                        icon="plus-circle"
+                    >
+                        Kredi Ekle
+                    </Button>
+                </Surface>
             </ScrollView>
         </SafeAreaView>
     );

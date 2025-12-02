@@ -310,6 +310,41 @@ app.post('/api/admin/styles/delete', async (req, res) => {
     }
 });
 
+// Add credits to user (admin only)
+app.post('/api/admin/add-credits', async (req, res) => {
+    try {
+        const { userId, userEmail, credits } = req.body;
+
+        const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+        if (!user || user.email !== ADMIN_EMAIL) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const { data, error } = await supabase.rpc('add_credits_manual', {
+            p_user_email: userEmail,
+            p_credits: credits
+        });
+
+        if (error) throw error;
+
+        // Parse the JSON result from the stored procedure
+        const result = typeof data === 'string' ? JSON.parse(data) : data;
+
+        if (!result.success) {
+            return res.status(404).json({ error: result.error });
+        }
+
+        res.json({
+            success: true,
+            credits_added: result.credits_added,
+            new_total: result.new_total
+        });
+    } catch (error) {
+        console.error('Error adding credits:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Backend server running on http://localhost:${port}`);
 });
