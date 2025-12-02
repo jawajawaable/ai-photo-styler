@@ -1,7 +1,4 @@
 // Backend API URL
-// For Android Emulator: http://10.0.2.2:3000
-// For iOS Simulator: http://localhost:3000
-// For Physical Device: Use your computer's local IP (e.g., http://192.168.1.x:3000) or ngrok URL
 const API_URL = 'https://ai-photo-styler-1-hozn.onrender.com/api/generate-style';
 
 export const generateStyledImage = async (base64Image, styleDescription, userId) => {
@@ -23,12 +20,14 @@ export const generateStyledImage = async (base64Image, styleDescription, userId)
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Server Error Text:', errorText); // Log the raw HTML/text
             try {
                 const errorData = JSON.parse(errorText);
-                throw new Error(errorData.error || 'Sunucu hatası');
+                throw new Error(errorData.error || 'Bir hata oluştu');
             } catch (e) {
-                throw new Error(`Sunucu Hatası (${response.status}): ${errorText.substring(0, 100)}...`);
+                if (response.status === 403) {
+                    throw new Error('Yetersiz kredi! Lütfen kredi yükleyin.');
+                }
+                throw new Error('Sunucu hatası. Lütfen tekrar deneyin.');
             }
         }
 
@@ -38,11 +37,11 @@ export const generateStyledImage = async (base64Image, styleDescription, userId)
             return result;
         } catch (e) {
             console.error('JSON Parse Error. Raw response:', resultText);
-            throw new Error('Sunucudan geçersiz yanıt alındı (HTML olabilir).');
+            throw new Error('Sunucudan geçersiz yanıt alındı.');
         }
 
     } catch (error) {
         console.error('Service Error:', error);
-        throw new Error(`Servis Hatası: ${error.message}`);
+        throw error;
     }
 };
