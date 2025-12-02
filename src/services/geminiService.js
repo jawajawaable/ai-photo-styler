@@ -1,21 +1,27 @@
 // Backend API URL
-const API_URL = 'https://ai-photo-styler-1-hozn.onrender.com/api/generate-style';
+const API_URL = 'https://ai-photo-styler-1-hozn.onrender.com';
 
-export const generateStyledImage = async (base64Image, styleDescription, userId) => {
+export const generateStyledImage = async (base64Image, styleDescription, userId, image2Base64 = null) => {
     try {
-        console.log('Backend API çağrılıyor:', API_URL);
+        console.log('Backend API çağrılıyor:', `${API_URL}/api/generate-style`);
 
-        const response = await fetch(API_URL, {
+        const body = {
+            image: base64Image,
+            prompt: styleDescription,
+            userId: userId,
+        };
+
+        if (image2Base64) {
+            body.image2 = image2Base64;
+        }
+
+        const response = await fetch(`${API_URL}/api/generate-style`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'ngrok-skip-browser-warning': 'true',
             },
-            body: JSON.stringify({
-                image: base64Image,
-                prompt: styleDescription,
-                userId: userId,
-            }),
+            body: JSON.stringify(body),
         });
 
         if (!response.ok) {

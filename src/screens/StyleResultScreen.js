@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Image, ScrollView, Alert, TouchableOpacity, Dimensions } from 'react-native';
-import { Text, ActivityIndicator, IconButton } from 'react-native-paper';
+import { Text, ActivityIndicator, IconButton, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { generateStyledImage } from '../services/geminiService';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 
 const API_URL = 'https://ai-photo-styler-1-hozn.onrender.com';
 const { width, height } = Dimensions.get('window');
@@ -27,6 +28,7 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
     const [resultImage, setResultImage] = useState(null);
     const [availableStyles, setAvailableStyles] = useState([]);
     const [stylesLoading, setStylesLoading] = useState(true);
+    const [image2, setImage2] = useState(null); // { uri, base64 }
 
     useEffect(() => {
         fetchStyles();
@@ -43,7 +45,8 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
                     description: s.description,
                     promptModifier: s.prompt_modifier,
                     icon: s.icon,
-                    color: s.color
+                    color: s.color,
+                    requiresTwoPhotos: s.requires_two_photos
                 }));
                 setAvailableStyles(formattedStyles);
             } else {
@@ -78,13 +81,51 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
         }
     };
 
+    const pickSecondImage = async (style) => {
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.5,
+            base64: true,
+        });
+
+        if (!result.canceled) {
+            const secondImage = result.assets[0];
+            setImage2(secondImage);
+            // Automatically apply style after selecting second image
+            applyStyleWithImages(style, secondImage.base64);
+        }
+    };
+
     const handleApplyStyle = async (style) => {
         if (!style || !imageBase64) return;
-
-        setLoading(true);
         setSelectedStyle(style);
+
+        if (style.requiresTwoPhotos && !image2) {
+            Alert.alert(
+                'İkinci Fotoğraf Gerekli',
+                'Bu stil için ikinci bir fotoğraf (eşiniz/partneriniz) seçmelisiniz.',
+                [
+                    { text: 'İptal', style: 'cancel' },
+                    { text: 'Fotoğraf Seç', onPress: () => pickSecondImage(style) }
+                ]
+            );
+            return;
+        }
+
+        applyStyleWithImages(style, image2?.base64);
+    };
+
+    const applyStyleWithImages = async (style, secondImageBase64) => {
+        setLoading(true);
         try {
-            const result = await generateStyledImage(imageBase64, style.promptModifier, userId);
+            const result = await generateStyledImage(
+                imageBase64,
+                style.promptModifier,
+                userId,
+                secondImageBase64
+            );
+
             if (result.type === 'image') {
                 setResultImage(`data:image/png;base64,${result.data}`);
                 // Refresh credits after successful generation
@@ -124,6 +165,14 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
                     <View style={styles.loadingOverlay}>
                         <ActivityIndicator size="large" color="#fff" />
                         <Text style={styles.loadingText}>Oluşturuluyor...</Text>
+                    </View>
+                )}
+                {image2 && !resultImage && (
+                    <View style={styles.secondImagePreview}>
+                        <Image source={{ uri: image2.uri }} style={styles.secondImage} />
+                        <View style={styles.plusBadge}>
+                            <Text style={styles.plusText}>+</Text>
+                        </View>
                     </View>
                 )}
             </View>
@@ -278,5 +327,38 @@ const styles = StyleSheet.create({
     styleNameSelected: {
         color: '#000',
         fontWeight: '600',
+    },
+    secondImagePreview: {
+        position: 'absolute',
+        bottom: 20,
+        left: 20,
+        width: 80,
+        height: 80,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#fff',
+        overflow: 'hidden',
+    },
+    secondImage: {
+        width: '100%',
+        height: '100%',
+    },
+    plusBadge: {
+        position: 'absolute',
+        top: -10,
+        right: -10,
+        backgroundColor: '#0095f6',
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    plusText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
     },
 });

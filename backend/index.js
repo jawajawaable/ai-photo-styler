@@ -24,7 +24,7 @@ const supabase = require('./supabaseClient');
 
 app.post('/api/generate-style', async (req, res) => {
     try {
-        const { image, prompt, userId } = req.body;
+        const { image, prompt, userId, image2 } = req.body;
 
         if (!image || !prompt || !userId) {
             return res.status(400).json({ error: 'Image, prompt, and userId are required' });
@@ -50,6 +50,7 @@ app.post('/api/generate-style', async (req, res) => {
 
         // Clean base64 string
         const cleanBase64 = image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
+        const cleanBase64_2 = image2 ? image2.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '') : null;
 
         // Generate a unique ID for this transaction
         const timestamp = Date.now();
@@ -63,10 +64,28 @@ app.post('/api/generate-style', async (req, res) => {
 
         if (uploadError) console.warn('Input image upload failed:', uploadError.message);
 
+        if (cleanBase64_2) {
+            const inputBuffer2 = Buffer.from(cleanBase64_2, 'base64');
+            const { error: uploadError2 } = await supabase.storage
+                .from('images')
+                .upload(`inputs/${id}_2.jpg`, inputBuffer2, { contentType: 'image/jpeg' });
+            if (uploadError2) console.warn('Input image 2 upload failed:', uploadError2.message);
+        }
+
         // 2. Call Gemini API
         const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
-        const fullPrompt = `You are an expert artistic style transfer AI. 
+        const fullPrompt = cleanBase64_2
+            ? `You are an expert artistic style transfer AI that combines two people into a single artistic image.
+
+USER REQUEST: "${prompt}"
+
+INSTRUCTIONS:
+1. Combine the two people from the input images into a single cohesive scene following the USER REQUEST style description.
+2. Maintain the identity, gender, and main facial features of both subjects.
+3. Position them naturally together as described in the style prompt.
+4. Output a high-quality, cohesive image with both people.`
+            : `You are an expert artistic style transfer AI. 
     
     TASK:
     Transform the INPUT IMAGE to match the visual style described below.
@@ -87,7 +106,18 @@ app.post('/api/generate-style', async (req, res) => {
             },
         };
 
-        const result = await model.generateContent([fullPrompt, imagePart]);
+        // Build content array with one or two images
+        const contentParts = [fullPrompt, imagePart];
+        if (cleanBase64_2) {
+            contentParts.push({
+                inlineData: {
+                    data: cleanBase64_2,
+                    mimeType: "image/jpeg",
+                },
+            });
+        }
+
+        const result = await model.generateContent(contentParts);
         const response = await result.response;
 
         console.log('Gemini API Response received');
