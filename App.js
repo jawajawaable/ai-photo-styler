@@ -9,6 +9,7 @@ import AuthScreen from './src/screens/AuthScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import PurchaseScreen from './src/screens/PurchaseScreen';
 import { supabase } from './src/services/supabaseClient';
 
 const theme = {
@@ -89,6 +90,10 @@ export default function App() {
     setCurrentScreen('admin');
   };
 
+  const navigateToPurchase = () => {
+    setCurrentScreen('purchase');
+  };
+
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
@@ -108,6 +113,12 @@ export default function App() {
             userId={session.user.id}
             onBack={navigateHome}
             onAdminPress={navigateToAdmin}
+            onPurchasePress={navigateToPurchase}
+            credits={credits}
+          />
+        ) : currentScreen === 'purchase' ? (
+          <PurchaseScreen
+            onBack={navigateToProfile}
             credits={credits}
           />
         ) : currentScreen === 'admin' ? (

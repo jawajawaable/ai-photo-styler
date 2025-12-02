@@ -4,7 +4,7 @@ import { Text, Surface, Button, Divider, useTheme, Icon } from 'react-native-pap
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabaseClient';
 
-export default function ProfileScreen({ userId, onBack, onAdminPress, credits }) {
+export default function ProfileScreen({ userId, onBack, onAdminPress, credits, onPurchasePress }) {
     const theme = useTheme();
     const [profile, setProfile] = useState(null);
     const [email, setEmail] = useState('');
@@ -71,6 +71,15 @@ export default function ProfileScreen({ userId, onBack, onAdminPress, credits })
                             <Text variant="bodyMedium" style={styles.infoLabel}>Kalan Kredi</Text>
                         </View>
                     </View>
+
+                    <Button
+                        mode="contained"
+                        onPress={onPurchasePress}
+                        style={styles.buyCreditsButton}
+                        icon="plus-circle"
+                    >
+                        Kredi Al
+                    </Button>
 
                     <Divider style={styles.divider} />
 
@@ -214,5 +223,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#000',
+    },
+    buyCreditsButton: {
+        marginTop: 16,
+        borderRadius: 8,
     },
 });
