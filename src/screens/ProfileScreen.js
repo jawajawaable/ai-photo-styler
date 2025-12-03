@@ -85,7 +85,9 @@ export default function ProfileScreen({ userId, onBack, credits, onJobPress }) {
                         <Text style={styles.jobStatus}>{getTimeRemaining(job.estimated_completion)}</Text>
                     )}
                     {isFailed && (
-                        <Text style={styles.errorText}>Failed</Text>
+                        <Text style={styles.errorText} numberOfLines={2}>
+                            {job.error_message || 'Failed'}
+                        </Text>
                     )}
                 </View>
             </TouchableOpacity>
