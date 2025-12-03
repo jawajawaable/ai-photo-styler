@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Image, ScrollView, Alert, TouchableOpacity, Dimensions } from 'react-native';
-import { Text, ActivityIndicator, IconButton, Button } from 'react-native-paper';
+import { Text, ActivityIndicator, IconButton, Button, Portal, Modal } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { generateStyledImage } from '../services/geminiService';
 import * as MediaLibrary from 'expo-media-library';
@@ -30,6 +30,7 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
     const [availableStyles, setAvailableStyles] = useState([]);
     const [stylesLoading, setStylesLoading] = useState(true);
     const [image2, setImage2] = useState(null); // { uri, base64 }
+    const [showCreditDialog, setShowCreditDialog] = useState(false);
 
     useEffect(() => {
         fetchStyles();
@@ -137,26 +138,19 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
         } catch (error) {
             // Check if it's a credit error
             if (error.message.includes('Yetersiz kredi')) {
-                Alert.alert(
-                    'Yetersiz Kredi',
-                    'Stil uygulamak için krediniz yeterli değil. Kredi almak ister misiniz?',
-                    [
-                        { text: 'İptal', style: 'cancel' },
-                        {
-                            text: 'Kredi Al',
-                            onPress: () => {
-                                if (onPurchasePress) {
-                                    onPurchasePress();
-                                }
-                            }
-                        }
-                    ]
-                );
+                setShowCreditDialog(true);
             } else {
                 Alert.alert('Hata', error.message);
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleBuyCredits = () => {
+        setShowCreditDialog(false);
+        if (onPurchasePress) {
+            onPurchasePress();
         }
     };
 
@@ -247,6 +241,43 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
                     )}
                 </ScrollView>
             </SafeAreaView>
+
+            <Portal>
+                <Modal
+                    visible={showCreditDialog}
+                    onDismiss={() => setShowCreditDialog(false)}
+                    contentContainerStyle={styles.modalContainer}
+                >
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalIconContainer}>
+                            <Text style={styles.modalIcon}>💎</Text>
+                        </View>
+
+                        <Text style={styles.modalTitle}>Yetersiz Kredi</Text>
+                        <Text style={styles.modalText}>
+                            Bu stili oluşturmak için yeterli krediniz bulunmuyor. Devam etmek için kredi yükleyebilirsiniz.
+                        </Text>
+
+                        <View style={styles.modalButtons}>
+                            <Button
+                                mode="outlined"
+                                onPress={() => setShowCreditDialog(false)}
+                                style={styles.modalButton}
+                                textColor="#666"
+                            >
+                                Vazgeç
+                            </Button>
+                            <Button
+                                mode="contained"
+                                onPress={handleBuyCredits}
+                                style={[styles.modalButton, { backgroundColor: '#0095f6' }]}
+                            >
+                                Kredi Al
+                            </Button>
+                        </View>
+                    </View>
+                </Modal>
+            </Portal>
         </View>
     );
 }
@@ -398,5 +429,58 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: 'bold',
         fontSize: 14,
+    },
+    modalContainer: {
+        padding: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        padding: 24,
+        width: '90%',
+        maxWidth: 400,
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    modalIconContainer: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: '#f0f9ff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    modalIcon: {
+        fontSize: 32,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#000',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    modalText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 20,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+        width: '100%',
+    },
+    modalButton: {
+        flex: 1,
+        borderRadius: 12,
     },
 });
