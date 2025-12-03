@@ -13,7 +13,7 @@ app.use(bodyParser.json({ limit: '50mb' })); // Increased limit for base64 image
 
 // Gemini Setup
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL_NAME = 'gemini-1.5-flash';
+const MODEL_NAME = 'gemini-1.5-flash-001';
 
 // Health Check Route for Render
 app.get('/', (req, res) => {
