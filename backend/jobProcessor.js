@@ -35,22 +35,46 @@ module.exports = function (app, supabase, genAI, MODEL_NAME) {
                     const { data: profile, error: profileError } = await supabase
                         .from('profiles')
 
-                    const imageParts = [
-                        {
-                            inlineData: {
-                                mimeType: contentType,
-                                data: imageBase64,
-                            },
-                        },
-                    ];
+                    // Download input images from URL
+                    console.log(`Downloading input image from: ${job.input_image_url}`);
+                    const imageResponse = await fetch(job.input_image_url);
 
-                    if (image2Base64) {
-                        imageParts.push({
-                            inlineData: {
-                                mimeType: image2ContentType,
-                                data: image2Base64,
-                            },
-                        });
+                    if (!imageResponse.ok) {
+                        throw new Error(`Failed to download input image: ${imageResponse.status} ${imageResponse.statusText}`);
+                    }
+
+                    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+                    console.log(`Input image content type: ${contentType}`);
+
+                    if (!contentType || !contentType.startsWith('image/')) {
+                        const errorBody = await imageResponse.text();
+                        throw new Error(`Invalid image content type: ${contentType}. Response body: ${errorBody.substring(0, 200)}`);
+                    }
+
+                    const imageBuffer = await imageResponse.arrayBuffer();
+                    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+
+                    let image2Base64 = null;
+                    let image2ContentType = 'image/jpeg';
+
+                    if (job.input_image2_url) {
+                        console.log(`Downloading input image 2 from: ${job.input_image2_url}`);
+                        const image2Response = await fetch(job.input_image2_url);
+
+                        if (!image2Response.ok) {
+                            throw new Error(`Failed to download input image 2: ${image2Response.status} ${image2Response.statusText}`);
+                        }
+
+                        image2ContentType = image2Response.headers.get('content-type');
+                        console.log(`Input image 2 content type: ${image2ContentType}`);
+
+                        if (!image2ContentType || !image2ContentType.startsWith('image/')) {
+                            const errorBody = await image2Response.text();
+                            throw new Error(`Invalid input image 2 content type: ${image2ContentType}. Response body: ${errorBody.substring(0, 200)}`);
+                        }
+
+                        const image2Buffer = await image2Response.arrayBuffer();
+                        image2Base64 = Buffer.from(image2Buffer).toString('base64');
                     }
 
                     const result = await model.generateContent([
