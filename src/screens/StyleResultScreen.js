@@ -23,18 +23,29 @@ const STYLES = [
     { id: 'dugun', name: 'Düğün', description: 'İki kişilik düğün fotoğrafı.', promptModifier: 'Ultra-realistic, highly detailed, close-up cinematic portrait of a groom in a grey suit and a bride in a lace wedding dress, shaking hands. light blue, cloudy, and moody background. Dramatic studio lighting. Photorealistic. (Gri takım elbiseli bir damat ve dantelli gelinlikli bir gelinin el sıkıştığı ultra gerçekçi, çok detaylı, yakın çekim sinematik portresi. açık mavi mavi, bulutlu ve karamsar arka plan. Dramatik stüdyo aydınlatması. Foto-gerçekçi.)', icon: '💑', color: '#ec4899', requiresTwoPhotos: true }
 ];
 
-export default function StyleResultScreen({ imageUri, imageBase64, onBack, userId, credits, onCreditsUpdate, onPurchasePress }) {
-    const [selectedStyle, setSelectedStyle] = useState(null);
+export default function StyleResultScreen({ inputImages, onBack, userId, credits, onCreditsUpdate, onPurchasePress, initialStyle }) {
+    const [selectedStyle, setSelectedStyle] = useState(initialStyle || null);
     const [loading, setLoading] = useState(false);
     const [resultImage, setResultImage] = useState(null);
     const [availableStyles, setAvailableStyles] = useState([]);
     const [stylesLoading, setStylesLoading] = useState(true);
-    const [image2, setImage2] = useState(null); // { uri, base64 }
     const [showCreditDialog, setShowCreditDialog] = useState(false);
+
+    // Extract images from input array
+    const image1 = inputImages && inputImages[0];
+    const image2 = inputImages && inputImages[1];
 
     useEffect(() => {
         fetchStyles();
     }, []);
+
+    // Auto-generate when we have initial style and images
+    useEffect(() => {
+        if (initialStyle && image1 && !loading && !resultImage) {
+            console.log('Auto-generating with style:', initialStyle.name);
+            handleApplyStyle(initialStyle);
+        }
+    }, [initialStyle, image1]);
 
     const fetchStyles = async () => {
         try {
@@ -83,60 +94,34 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
         }
     };
 
-    const pickSecondImage = async (style) => {
-        let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: false,
-            quality: 0.5,
-            base64: true,
-        });
-
-        if (!result.canceled) {
-            const secondImage = result.assets[0];
-            setImage2(secondImage);
-            // Automatically apply style after selecting second image
-            applyStyleWithImages(style, secondImage.base64);
-        }
+    const handleApplyStyle = async (style) => {
+        if (!style || !image1) return;
+        setSelectedStyle(style);
+        applyStyleWithImages(style);
     };
 
-    const handleApplyStyle = async (style) => {
-        if (!style || !imageBase64) return;
-        setSelectedStyle(style);
-
-        if (style.requiresTwoPhotos && !image2) {
-            Alert.alert(
-                'İkinci Fotoğraf Gerekli',
-                'Bu stil için ikinci bir fotoğraf (eşiniz/partneriniz) seçmelisiniz.',
-                [
-                    { text: 'İptal', style: 'cancel' },
-                    { text: 'Fotoğraf Seç', onPress: () => pickSecondImage(style) }
-                ]
-            );
+    const applyStyleWithImages = async (style) => {
+        if (!image1) {
+            Alert.alert('Hata', 'Fotoğraf bulunamadı');
             return;
         }
 
-        applyStyleWithImages(style, image2?.base64);
-    };
-
-    const applyStyleWithImages = async (style, secondImageBase64) => {
         setLoading(true);
         try {
             const result = await generateStyledImage(
-                imageBase64,
+                image1.base64,
                 style.promptModifier,
                 userId,
-                secondImageBase64
+                image2?.base64
             );
 
             if (result.type === 'image') {
                 setResultImage(`data:image/png;base64,${result.data}`);
-                // Refresh credits after successful generation
                 if (onCreditsUpdate) {
                     onCreditsUpdate();
                 }
             }
         } catch (error) {
-            // Check if it's a credit error
             if (error.message.includes('Yetersiz kredi')) {
                 setShowCreditDialog(true);
             } else {
@@ -179,7 +164,7 @@ export default function StyleResultScreen({ imageUri, imageBase64, onBack, userI
             {/* Image Preview */}
             <View style={styles.imageContainer}>
                 <Image
-                    source={{ uri: resultImage || imageUri }}
+                    source={{ uri: resultImage || image1?.uri }}
                     style={styles.image}
                     resizeMode="cover"
                 />

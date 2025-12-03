@@ -1,64 +1,110 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { Text, Surface, Icon, useTheme } from 'react-native-paper';
-import * as ImagePicker from 'expo-image-picker';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
+import { Text, Icon, useTheme, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabaseClient';
+import StyleCard from '../components/StyleCard';
+import * as ImagePicker from 'expo-image-picker';
 
-const { width } = Dimensions.get('window');
-
-export default function HomeScreen({ onImageSelected, credits, onProfilePress }) {
+export default function HomeScreen({ onStyleSelected, credits, onProfilePress }) {
     const theme = useTheme();
+    const [styles, setStyles] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
-    const pickImage = async () => {
-        let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: false,
-            quality: 0.5,
-            base64: true,
-        });
+    useEffect(() => {
+        fetchStyles();
+    }, []);
 
-        if (!result.canceled) {
-            onImageSelected(result.assets[0]);
+    const fetchStyles = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('styles')
+                .select('*')
+                .eq('is_active', true)
+                .order('sort_order', { ascending: true });
+
+            if (error) throw error;
+            setStyles(data || []);
+        } catch (error) {
+            console.error('Error fetching styles:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
         }
     };
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <View style={styles.headerTop}>
-                    <View>
-                        <Text variant="displaySmall" style={styles.title}>Sanatını</Text>
-                        <Text variant="displaySmall" style={[styles.title, { color: theme.colors.primary, fontWeight: 'bold' }]}>
-                            Keşfet
-                        </Text>
-                    </View>
-                    <View style={styles.creditContainer}>
-                        <Surface style={styles.creditBadge} elevation={1}>
-                            <Icon source="star" size={16} color="#fbbf24" />
-                            <Text style={styles.creditText}>{credits !== null ? credits : '-'} Kredi</Text>
-                        </Surface>
-                        <TouchableOpacity onPress={onProfilePress}>
-                            <Icon source="account-circle" size={32} color={theme.colors.primary} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-                <Text variant="bodyLarge" style={styles.subtitle}>
-                    Fotoğraflarını yapay zeka ile eşsiz sanat eserlerine dönüştür.
-                </Text>
-            </View>
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchStyles();
+    };
 
-            <View style={styles.content}>
-                <TouchableOpacity onPress={pickImage} activeOpacity={0.9}>
-                    <Surface style={styles.uploadCard} elevation={2}>
-                        <View style={[styles.iconContainer, { backgroundColor: theme.colors.primaryContainer }]}>
-                            <Icon source="image-plus" size={40} color={theme.colors.primary} />
-                        </View>
-                        <Text variant="titleLarge" style={styles.cardTitle}>Fotoğraf Seç</Text>
-                        <Text variant="bodyMedium" style={styles.cardSubtitle}>Galerinden bir fotoğraf yükle</Text>
-                    </Surface>
+    const handleStylePress = (style) => {
+        onStyleSelected(style);
+    };
+
+    const renderSection = (title, data, size = 'medium') => (
+        <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+                <Text variant="titleLarge" style={styles.sectionTitle}>{title}</Text>
+                <TouchableOpacity>
+                    <Text variant="bodyMedium" style={styles.seeAll}>Tümünü Gör</Text>
                 </TouchableOpacity>
             </View>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {data.map((style) => (
+                    <StyleCard
+                        key={style.id}
+                        style={style}
+                        size={size}
+                        onPress={handleStylePress}
+                    />
+                ))}
+            </ScrollView>
+        </View>
+    );
+
+    // Group styles for demo purposes (in real app, use categories)
+    const popularStyles = styles.slice(0, 3);
+    const newStyles = styles.slice(3, 6);
+    const allStyles = styles;
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top']}>
+            <View style={styles.header}>
+                <Text variant="headlineMedium" style={styles.logo}>SATRAYNI</Text>
+                <View style={styles.headerRight}>
+                    <View style={styles.proBadge}>
+                        <Text style={styles.proText}>PRO</Text>
+                    </View>
+                    <TouchableOpacity onPress={onProfilePress} style={styles.profileButton}>
+                        <Icon source="account-circle" size={28} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <ScrollView
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
+                }
+            >
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator color={theme.colors.primary} size="large" />
+                    </View>
+                ) : (
+                    <>
+                        {renderSection('Popüler', popularStyles, 'large')}
+                        {renderSection('Yeni Eklenenler', newStyles, 'medium')}
+                        {renderSection('Tüm Stiller', allStyles, 'medium')}
+                    </>
+                )}
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -69,68 +115,59 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     header: {
-        paddingHorizontal: 24,
-        paddingTop: 40,
-        paddingBottom: 20,
-    },
-    headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
     },
-    creditContainer: {
-        alignItems: 'flex-end',
-        gap: 10,
+    logo: {
+        fontWeight: '900',
+        color: '#000',
+        letterSpacing: 1,
     },
-    creditBadge: {
+    headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        backgroundColor: '#fff',
-        gap: 6,
+        gap: 12,
     },
-    creditText: {
+    proBadge: {
+        backgroundColor: '#6200ee',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    proText: {
+        color: '#fff',
         fontWeight: 'bold',
-        color: '#333',
-    },
-    title: {
-        lineHeight: 40,
-    },
-    subtitle: {
-        marginTop: 12,
-        color: '#666',
-        lineHeight: 22,
+        fontSize: 12,
     },
     content: {
-        flex: 1,
-        padding: 24,
-        justifyContent: 'center',
+        paddingBottom: 100, // Space for bottom nav
     },
-    uploadCard: {
-        borderRadius: 24,
-        padding: 40,
+    loadingContainer: {
+        height: 200,
+        justifyContent: 'center',
         alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f8f9fa',
-        borderWidth: 1,
-        borderColor: '#eee',
-        height: 300,
     },
-    iconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+    section: {
+        marginBottom: 32,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 20,
+        paddingHorizontal: 20,
+        marginBottom: 16,
     },
-    cardTitle: {
+    sectionTitle: {
+        color: '#000',
         fontWeight: 'bold',
-        marginBottom: 8,
     },
-    cardSubtitle: {
-        color: '#888',
+    seeAll: {
+        color: '#666',
+    },
+    scrollContent: {
+        paddingHorizontal: 20,
     },
 });
