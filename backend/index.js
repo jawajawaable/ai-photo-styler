@@ -346,7 +346,7 @@ app.post('/api/admin/add-credits', async (req, res) => {
 });
 
 // Import and start job processor
-require('./jobProcessor');
+require('./jobProcessor')(app, supabase, genAI, MODEL_NAME);
 
 app.listen(port, () => {
     console.log(`Backend server running on http://localhost:${port}`);
