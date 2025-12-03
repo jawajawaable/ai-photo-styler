@@ -34,6 +34,13 @@ module.exports = function (app, supabase, genAI, MODEL_NAME) {
                     // Check credits
                     const { data: profile, error: profileError } = await supabase
                         .from('profiles')
+                        .select('credits')
+                        .eq('id', job.user_id)
+                        .single();
+
+                    if (profileError || profile.credits < 1) {
+                        throw new Error('Yetersiz kredi');
+                    }
 
                     // Download input images from URL
                     console.log(`Downloading input image from: ${job.input_image_url}`);
@@ -75,6 +82,27 @@ module.exports = function (app, supabase, genAI, MODEL_NAME) {
 
                         const image2Buffer = await image2Response.arrayBuffer();
                         image2Base64 = Buffer.from(image2Buffer).toString('base64');
+                    }
+
+                    // Generate with Gemini
+                    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+
+                    const imageParts = [
+                        {
+                            inlineData: {
+                                mimeType: contentType,
+                                data: imageBase64,
+                            },
+                        },
+                    ];
+
+                    if (image2Base64) {
+                        imageParts.push({
+                            inlineData: {
+                                mimeType: image2ContentType,
+                                data: image2Base64,
+                            },
+                        });
                     }
 
                     const result = await model.generateContent([

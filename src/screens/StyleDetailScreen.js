@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabaseClient';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,17 +32,27 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
 
         setCreating(true);
         try {
-            // Upload images to Supabase Storage using URI directly
+            // Upload images to Supabase Storage
             const timestamp = Date.now();
             const image1Path = `inputs/${userId}/${timestamp}_1.jpg`;
 
-            // Read file and upload
+            // Read file as base64 using FileSystem
+            const base64Image1 = await FileSystem.readAsStringAsync(image1.uri, {
+                encoding: 'base64',
+            });
+
+            // Convert base64 to ArrayBuffer
+            const binaryString1 = atob(base64Image1);
+            const bytes1 = new Uint8Array(binaryString1.length);
+            for (let i = 0; i < binaryString1.length; i++) {
+                bytes1[i] = binaryString1.charCodeAt(i);
+            }
+
             const { error: uploadError1 } = await supabase.storage
                 .from('style-images')
-                .upload(image1Path, {
-                    uri: image1.uri,
-                    type: 'image/jpeg',
-                    name: `${timestamp}_1.jpg`,
+                .upload(image1Path, bytes1.buffer, {
+                    contentType: 'image/jpeg',
+                    upsert: true,
                 });
 
             if (uploadError1) throw uploadError1;
@@ -55,12 +65,21 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
             if (image2) {
                 const image2Path = `inputs/${userId}/${timestamp}_2.jpg`;
 
+                const base64Image2 = await FileSystem.readAsStringAsync(image2.uri, {
+                    encoding: 'base64',
+                });
+
+                const binaryString2 = atob(base64Image2);
+                const bytes2 = new Uint8Array(binaryString2.length);
+                for (let i = 0; i < binaryString2.length; i++) {
+                    bytes2[i] = binaryString2.charCodeAt(i);
+                }
+
                 const { error: uploadError2 } = await supabase.storage
                     .from('style-images')
-                    .upload(image2Path, {
-                        uri: image2.uri,
-                        type: 'image/jpeg',
-                        name: `${timestamp}_2.jpg`,
+                    .upload(image2Path, bytes2.buffer, {
+                        contentType: 'image/jpeg',
+                        upsert: true,
                     });
 
                 if (uploadError2) throw uploadError2;
