@@ -37,49 +37,6 @@ module.exports = function (app, supabase, genAI, MODEL_NAME) {
                         .select('credits')
                         .eq('id', job.user_id)
                         .single();
-
-                    if (profileError || profile.credits < 1) {
-                        throw new Error('Yetersiz kredi');
-                    }
-
-                    // Download input images from URL
-                    const imageResponse = await fetch(job.input_image_url);
-                    const imageBuffer = await imageResponse.arrayBuffer();
-                    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-
-                    let image2Base64 = null;
-                    if (job.input_image2_url) {
-                        const image2Response = await fetch(job.input_image2_url);
-                        const image2Buffer = await image2Response.arrayBuffer();
-                        image2Base64 = Buffer.from(image2Buffer).toString('base64');
-                    }
-
-                    // Generate with Gemini
-                    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-
-                    const imageParts = [
-                        {
-                            inlineData: {
-                                mimeType: 'image/jpeg',
-                                data: imageBase64,
-                            },
-                        },
-                    ];
-
-                    if (image2Base64) {
-                        imageParts.push({
-                            inlineData: {
-                                mimeType: 'image/jpeg',
-                                data: image2Base64,
-                            },
-                        });
-                    }
-
-                    const result = await model.generateContent([
-                        job.prompt,
-                        ...imageParts,
-                    ]);
-
                     const response = await result.response;
                     const candidates = response.candidates || [];
 
