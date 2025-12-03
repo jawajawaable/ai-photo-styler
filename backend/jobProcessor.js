@@ -37,6 +37,60 @@ module.exports = function (app, supabase, genAI, MODEL_NAME) {
                         .select('credits')
                         .eq('id', job.user_id)
                         .single();
+                    // Download input images from URL
+                    console.log(`Downloading input image from: ${job.input_image_url}`);
+                    const imageResponse = await fetch(job.input_image_url);
+
+                    if (!imageResponse.ok) {
+                        throw new Error(`Failed to download input image: ${imageResponse.status} ${imageResponse.statusText}`);
+                    }
+
+                    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+                    const imageBuffer = await imageResponse.arrayBuffer();
+                    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+
+                    let image2Base64 = null;
+                    let image2ContentType = 'image/jpeg';
+
+                    if (job.input_image2_url) {
+                        console.log(`Downloading input image 2 from: ${job.input_image2_url}`);
+                        const image2Response = await fetch(job.input_image2_url);
+
+                        if (!image2Response.ok) {
+                            throw new Error(`Failed to download input image 2: ${image2Response.status} ${image2Response.statusText}`);
+                        }
+
+                        image2ContentType = image2Response.headers.get('content-type') || 'image/jpeg';
+                        const image2Buffer = await image2Response.arrayBuffer();
+                        image2Base64 = Buffer.from(image2Buffer).toString('base64');
+                    }
+
+                    // Generate with Gemini
+                    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+
+                    const imageParts = [
+                        {
+                            inlineData: {
+                                mimeType: contentType,
+                                data: imageBase64,
+                            },
+                        },
+                    ];
+
+                    if (image2Base64) {
+                        imageParts.push({
+                            inlineData: {
+                                mimeType: image2ContentType,
+                                data: image2Base64,
+                            },
+                        });
+                    }
+
+                    const result = await model.generateContent([
+                        job.prompt,
+                        ...imageParts,
+                    ]);
+
                     const response = await result.response;
                     const candidates = response.candidates || [];
 
