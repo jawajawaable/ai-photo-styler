@@ -106,7 +106,7 @@ module.exports = function (app, supabase, genAI, MODEL_NAME) {
                     }
 
                     const result = await model.generateContent([
-                        job.prompt,
+                        { text: "Generate a high-quality image based on the following description. Do not provide any text explanation, just the image. Description: " + job.prompt },
                         ...imageParts,
                     ]);
 

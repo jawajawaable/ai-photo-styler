@@ -28,611 +28,295 @@
 <body class="bg-slate-900 text-white min-h-screen">
     <div id="app"></div>
 
-    <script>
-        // Supabase Configuration
-        const SUPABASE_URL = 'https://xbcvrqsbjybkwdyvrirz.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhiY3ZycXNianlia3dkeXZyaXJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1OTc3MzIsImV4cCI6MjA4MDE3MzczMn0.LtnuuzPhcug-VY0Am2HinRmIltWoPI6LW8Gu-Pz2gb4';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    <table class="w-full text-left text-sm text-slate-400">
+        <thead class="bg-slate-900 uppercase text-xs">
+            <tr>
+                <th class="px-6 py-4">ID</th>
+                <th class="px-6 py-4">Title</th>
+                <th class="px-6 py-4 text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700">
+            ${categories.map(c => `<tr>
+                <td class="px-6 py-4 text-indigo-400">${c.id}</td>
+                <td class="px-6 py-4 text-white">${c.title}</td>
+                <td class="px-6 py-4 text-right"><button onclick='openEditCategoryModal(${JSON.stringify(c).replace(/'
+                        /g, "&#39;" )})' class="text-indigo-400 mr-2">Edit</button><button
+                        onclick="deleteCategory('${c.id}')" class="text-red-400">Delete</button></td>
+            </tr>`).join('')}
+        </tbody>
+    </table>
+    </div>`;
+    }
 
-        // State
-        let currentUser = null;
-        let styles = [];
-        let categories = [];
-        let jobs = [];
-        let userStats = [];
-        let activeTab = 'styles';
-        let editingStyle = null;
-        let editingCategory = null;
-        let searchTerm = '';
-        let charts = {};
-        const ADMIN_EMAILS = ['a@a.com'];
+    function renderAnalyticsTab() {
+    return `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+            <h3 class="text-lg font-bold mb-4">Styles</h3>
+            <div class="h-64"><canvas id="stylesChart"></canvas></div>
+        </div>
+        <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+            <h3 class="text-lg font-bold mb-4">Daily</h3>
+            <div class="h-64"><canvas id="dailyChart"></canvas></div>
+        </div>
+    </div>
+    <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
+        <h3 class="text-lg font-bold mb-4">Top Users</h3>
+        <div id="usersTableBody">Loading...</div>
+    </div>
+    `;
+    }
 
-        // Initialize
-        async function init() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                currentUser = session.user;
-                if (!ADMIN_EMAILS.includes(currentUser.email)) {
-                    alert('⛔ Erişim reddedildi!');
-                    await supabase.auth.signOut();
-                    renderLogin();
-                    return;
-                }
-                await loadData();
-                renderApp();
-            } else {
-                renderLogin();
-            }
-        }
+    function renderCleanupTab() {
+    return `
+    <div class="max-w-xl mx-auto bg-slate-800 p-8 rounded-xl border border-red-500/30">
+        <h2 class="text-xl font-bold text-red-400 mb-6">Storage Cleanup</h2>
+        <div class="grid grid-cols-3 gap-4">
+            <button onclick="handleCleanup(3)"
+                class="p-4 bg-slate-900 border border-slate-700 rounded-xl hover:border-red-500">3 Days</button>
+            <button onclick="handleCleanup(7)"
+                class="p-4 bg-slate-900 border border-slate-700 rounded-xl hover:border-indigo-500">7 Days</button>
+            <button onclick="handleCleanup(30)"
+                class="p-4 bg-slate-900 border border-slate-700 rounded-xl hover:border-emerald-500">30 Days</button>
+        </div>
+    </div>`;
+    }
 
-        async function loadData() {
-            await Promise.all([loadStyles(), loadCategories()]);
-            if (activeTab === 'analytics') loadAnalytics();
-            if (activeTab === 'users') loadUserStats();
-        }
+    function renderCreditsTab() {
+    return `
+    <div class="max-w-xl mx-auto bg-slate-800 p-8 rounded-xl border border-emerald-500/30">
+        <h2 class="text-xl font-bold text-emerald-400 mb-4">Manage Credits</h2>
+        <form onsubmit="handleAddCredits(event)" class="space-y-4">
+            <input type="text" id="targetUserId" placeholder="User UUID" required
+                class="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white">
+            <input type="number" id="creditAmount" placeholder="Amount (e.g. 50)" required
+                class="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white">
+            <button type="submit"
+                class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-bold text-white">Update
+                Credits</button>
+        </form>
+    </div>`;
+    }
 
-        async function loadStyles() {
-            const { data, error } = await supabase.from('styles').select('*').order('sort_order', { ascending: true });
-            if (!error) styles = data || [];
-        }
+    function renderUsersTab() {
+    return `
+    <div class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
+        <div class="p-6 border-b border-slate-700 flex justify-between items-center">
+            <h2 class="text-xl font-bold">User Storage Management</h2>
+            <button onclick="loadUserStats(); renderApp()" class="text-indigo-400 hover:text-white">Refresh</button>
+        </div>
+        <table class="w-full text-left text-sm text-slate-400">
+            <thead class="bg-slate-900 uppercase text-xs">
+                <tr>
+                    <th class="px-6 py-4">User ID</th>
+                    <th class="px-6 py-4 text-center">Images (Jobs)</th>
+                    <th class="px-6 py-4">Last Active</th>
+                    <th class="px-6 py-4 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700">
+                ${userStats.length ? userStats.map(u => `
+                <tr class="hover:bg-slate-700/50">
+                    <td class="px-6 py-4 font-mono text-xs text-indigo-400">
+                        ${u.user_id}
+                        <button onclick="navigator.clipboard.writeText('${u.user_id}')"
+                            class="ml-2 text-slate-500 hover:text-white" title="Copy ID">📋</button>
+                    </td>
+                    <td class="px-6 py-4 text-center text-white font-bold">${u.job_count}</td>
+                    <td class="px-6 py-4 text-xs">${u.last_active ? new Date(u.last_active).toLocaleDateString() : '-'}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <button onclick="handleDeleteUserFiles('${u.user_id}')"
+                            class="px-3 py-1 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded border border-red-500/20 text-xs transition-colors">
+                            🗑️ Delete All Images
+                        </button>
+                    </td>
+                </tr>
+                `).join('') : '<tr>
+                    <td colspan="4" class="p-8 text-center">No users found</td>
+                </tr>'}
+            </tbody>
+        </table>
+    </div>`;
+    }
 
-        async function loadCategories() {
-            const { data, error } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
-            if (!error) categories = data || [];
-        }
-
-        async function loadAnalytics() {
-            const { data, error } = await supabase.rpc('get_admin_analytics_data', { limit_count: 1000 });
-            if (!error) {
-                jobs = data || [];
-            } else {
-                console.error('Analytics RPC error:', error);
-                const { data: fallback } = await supabase.from('jobs').select('id, style_id, user_id, created_at, status, style_name').order('created_at', { ascending: false }).limit(1000);
-                jobs = fallback || [];
-            }
-        }
-
-
-        async function loadUserStats() {
-            const { data, error } = await supabase.rpc('admin_get_user_stats');
-            if (error) alert('Error loading user stats: ' + error.message);
-            else userStats = data || [];
-        }
-
-        async function handleLogin(email, password) {
-            if (!ADMIN_EMAILS.includes(email)) return alert('⛔ Erişim reddedildi!');
-            const { error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) alert('Login error: ' + error.message);
-            else init();
-        }
-
-        async function handleLogout() {
-            await supabase.auth.signOut();
-            currentUser = null;
-            renderLogin();
-        }
-
-        // --- Styles Management ---
-        async function saveStyle(formData) {
-            try {
-                if (editingStyle) {
-                    const { error } = await supabase.from('styles').update(formData).eq('id', editingStyle.id);
-                    if (error) throw error;
-                } else {
-                    const { error } = await supabase.from('styles').insert([formData]);
-                    if (error) throw error;
-                }
-                await loadStyles();
-                closeModals();
-                renderApp();
-            } catch (error) { alert('Save error: ' + error.message); }
-        }
-
-        async function deleteStyle(id) {
-            if (!confirm('Delete this style?')) return;
-            const { error } = await supabase.from('styles').delete().eq('id', id);
-            if (error) alert('Delete error: ' + error.message);
-            else { await loadStyles(); renderApp(); }
-        }
-
-        async function toggleCarousel(styleId, currentStatus) {
-            const featuredCount = styles.filter(s => s.featured_in_carousel).length;
-            if (!currentStatus && featuredCount >= 8) {
-                alert('⚠️ Maksimum 8 stil carousel\'de olabilir!');
-                return;
-            }
-            const { error } = await supabase.from('styles').update({ featured_in_carousel: !currentStatus }).eq('id', styleId);
-            if (!error) { await loadStyles(); renderApp(); }
-        }
-
-        // --- Categories Management ---
-        async function saveCategory(formData) {
-            try {
-                if (editingCategory) {
-                    if (editingCategory.id !== formData.id) {
-                        // ID Change Logic
-                        const { data } = await supabase.from('categories').select('id').eq('id', formData.id).single();
-                        if (data) throw new Error('ID already exists!');
-                        const { error: catError } = await supabase.from('categories').update(formData).eq('id', editingCategory.id);
-                        if (catError) throw catError;
-                        const { error: styleError } = await supabase.from('styles').update({ category: formData.id }).eq('category', editingCategory.id);
-                        if (styleError) alert('Warning: Linked styles update failed.');
-                    } else {
-                        const { error } = await supabase.from('categories').update(formData).eq('id', editingCategory.id);
-                        if (error) throw error;
-                    }
-                } else {
-                    const exists = categories.find(c => c.id === formData.id);
-                    if (exists) throw new Error('ID already exists!');
-                    const { error } = await supabase.from('categories').insert([formData]);
-                    if (error) throw error;
-                }
-                await loadCategories(); closeModals(); renderApp();
-            } catch (error) { alert('Save error: ' + error.message); }
-        }
-
-        async function deleteCategory(id) {
-            if (!confirm('Delete category?')) return;
-            const { error } = await supabase.from('categories').delete().eq('id', id);
-            if (error) alert('Delete error: ' + error.message);
-            else { await loadCategories(); renderApp(); }
-        }
-
-        // --- Upload ---
-        async function uploadImage(file) {
-            const fileName = `${Date.now()}.${file.name.split('.').pop()}`;
-            const { error } = await supabase.storage.from('style-images').upload(fileName, file, { upsert: true });
-            if (error) throw error;
-            const { data: { publicUrl } } = supabase.storage.from('style-images').getPublicUrl(fileName);
-            return publicUrl;
-        }
-
-        // --- Helper: Resize ---
-        function resizeImage(file, maxWidth = 1080) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.src = e.target.result;
-                    img.onload = () => {
-                        const elem = document.createElement('canvas');
-                        let w = img.width, h = img.height;
-                        if (w > maxWidth) { h *= maxWidth / w; w = maxWidth; }
-                        elem.width = w; elem.height = h;
-                        const ctx = elem.getContext('2d');
-                        ctx.drawImage(img, 0, 0, w, h);
-                        elem.toBlob(blob => resolve(new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), { type: 'image/jpeg', lastModified: Date.now() })), 'image/jpeg', 0.8);
-                    };
-                };
-            });
-        }
-
-        // --- UI ---
-        let analyticsInterval = null;
-        function switchTab(tab) {
-            activeTab = tab;
-            if (analyticsInterval) clearInterval(analyticsInterval);
-            renderApp();
-            if (tab === 'analytics') {
-                loadAnalytics().then(() => {
-                    renderApp();
-                    analyticsInterval = setInterval(() => { if (activeTab === 'analytics') loadAnalytics().then(utils => initCharts()); }, 5000);
-                });
-            }
-            if (tab === 'users') loadUserStats().then(() => renderApp());
-        }
-
-        function openAddStyleModal() { editingStyle = null; showStyleModal({}); }
-        function openEditStyleModal(s) { editingStyle = s; showStyleModal(s); }
-        function openAddCategoryModal() { editingCategory = null; showCategoryModal({}); }
-        function openEditCategoryModal(c) { editingCategory = c; showCategoryModal(c); }
-        function closeModals() {
-            document.getElementById('styleModal').classList.add('hidden');
-            document.getElementById('categoryModal').classList.add('hidden');
-        }
-
-        // Handlers
-        async function handleStyleSubmit(e) {
-            e.preventDefault();
-            const form = e.target;
-            const formData = {
-                style_id: form.style_id.value,
-                name: form.name.value,
-                description: form.description.value,
-                category: form.category.value,
-                prompt_modifier: form.prompt_modifier.value,
-                icon: form.icon.value,
-                color: form.color.value,
-                sort_order: parseInt(form.sort_order.value),
-                requires_two_photos: form.requires_two_photos.checked,
-                featured_in_carousel: form.featured_in_carousel.checked,
-                short_description: form.short_description.value,
-                is_active: true
-            };
-            if (editingStyle?.image_url) formData.image_url = editingStyle.image_url;
-            let file = document.getElementById('styleImageUpload').files[0];
-            if (file) {
-                if (file.type.startsWith('image/')) file = await resizeImage(file);
-                formData.image_url = await uploadImage(file);
-            }
-            await saveStyle(formData);
-        }
-
-        async function handleCategorySubmit(e) {
-            e.preventDefault();
-            const form = e.target;
-            const formData = {
-                id: form.id.value,
-                title: form.title.value,
-                description: form.description.value,
-                icon: form.icon.value,
-                sort_order: parseInt(form.sort_order.value)
-            };
-            await saveCategory(formData);
-        }
-
-        async function handleAddCredits(e) {
-            e.preventDefault();
-            const userId = document.getElementById('targetUserId').value.trim();
-            const amount = parseInt(document.getElementById('creditAmount').value);
-            if (!userId || isNaN(amount)) return alert('Invalid Input');
-            try {
-                const { data, error } = await supabase.rpc('admin_add_credits', { target_user_id: userId, amount });
-                if (error) throw error;
-                if (data.success) alert(`Success! New Balance: ${data.new_balance}`); else alert('Failed: ' + data.message);
-            } catch (err) { alert('Error: ' + err.message); }
-        }
-
-        async function handleCleanup(days) {
-            if (!confirm(`Delete jobs older than ${days} days? Irreversible.`)) return;
-            const date = new Date(); date.setDate(date.getDate() - days);
-            const { data: oldJobs, error } = await supabase.from('jobs').select('id, input_image_url, input_image2_url, result_image_url').lt('created_at', date.toISOString()).limit(100);
-            if (error || !oldJobs.length) return alert(error ? error.message : 'No jobs found.');
-
-            const files = [];
-            const getPath = u => u ? u.split('/style-images/')[1] : null;
-            oldJobs.forEach(j => { [j.input_image_url, j.input_image2_url, j.result_image_url].forEach(u => { const p = getPath(u); if (p) files.push(p); }); });
-
-            if (files.length) await supabase.storage.from('style-images').remove(files);
-            await supabase.from('jobs').delete().in('id', oldJobs.map(j => j.id));
-            alert(`Deleted ${oldJobs.length} jobs.`);
-        }
-
-        async function handleDeleteUserFiles(userId) {
-            if (!confirm(`DANGER: Delete ALL files and jobs for user ${userId}? This cannot be undone.`)) return;
-
-            // 1. Get files
-            const { data: files, error: fileError } = await supabase.rpc('admin_get_user_file_paths', { target_user_id: userId });
-            if (fileError) return alert('Error fetching files: ' + fileError.message);
-
-            // 2. Cleanup Storage
-            const cleanFiles = [];
-            const getPath = u => u ? u.split('/style-images/')[1] : null;
-            files.forEach(f => {
-                const p = getPath(f.file_path);
-                if (p) cleanFiles.push(p);
-            });
-
-            if (cleanFiles.length) {
-                const { error: storageError } = await supabase.storage.from('style-images').remove(cleanFiles);
-                if (storageError) alert('Storage warning: ' + storageError.message);
-            }
-
-            // 3. Delete DB Records
-            const { error: dbError } = await supabase.from('jobs').delete().eq('user_id', userId);
-            if (dbError) alert('DB delete error: ' + dbError.message);
-            else {
-                alert(`Successfully cleared data for user ${userId}`);
-                await loadUserStats();
-                renderApp();
-            }
-        }
-
-        // --- RENDERERS ---
-        function renderLogin() {
-            document.getElementById('app').innerHTML = `
-                <div class="min-h-screen flex items-center justify-center p-4">
-                    <div class="bg-slate-800 p-8 rounded-xl w-full max-w-md border border-slate-700">
-                        <h1 class="text-2xl font-bold mb-6 text-center text-indigo-400">Satriq Admin</h1>
-                        <form onsubmit="event.preventDefault(); handleLogin(this.email.value, this.password.value);" class="space-y-4">
-                            <input type="email" name="email" placeholder="Email" class="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white">
-                            <input type="password" name="password" placeholder="Password" class="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white">
-                            <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold">Sign In</button>
-                        </form>
-                    </div></div>`;
-        }
-
-        function renderApp() {
-            document.getElementById('app').innerHTML = `
-                <div class="bg-slate-800 border-b border-slate-700 sticky top-0 z-40 shadow-lg">
-                    <div class="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
-                        <div class="flex items-center gap-8">
-                            <h1 class="text-xl font-bold">Satriq<span class="text-indigo-500">Admin</span></h1>
-                            <nav class="flex gap-1 h-full pt-1">
-                                ${['styles', 'categories', 'analytics', 'cleanup', 'credits', 'users'].map(t =>
-                `<button onclick="switchTab('${t}')" class="px-4 h-full font-medium text-sm capitalize ${activeTab === t ? 'tab-active' : 'tab-inactive'} ${t === 'cleanup' ? 'text-red-400' : t === 'credits' ? 'text-emerald-400' : ''}">${t}</button>`
-            ).join('')}
-                            </nav>
-                        </div>
-                        <button onclick="handleLogout()" class="text-slate-400 hover:text-white">Sign Out</button>
+    // --- Modals ---
+    function renderStyleModal() {
+    return `
+    <div id="styleModal"
+        class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="bg-slate-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-700 p-6">
+            <div class="flex justify-between mb-6">
+                <h2 id="styleModalTitle" class="text-xl font-bold">Edit Style</h2><button
+                    onclick="closeModals()">✕</button>
+            </div>
+            <form id="styleForm" onsubmit="handleStyleSubmit(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <div id="styleImagePreview" class="h-32 bg-slate-900 rounded mb-2 overflow-hidden"></div>
+                        <input type="file" id="styleImageUpload" class="text-sm text-slate-400">
+                    </div>
+                    <div class="space-y-3">
+                        <input name="style_id" placeholder="ID" required
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
+                        <input name="name" placeholder="Name" required
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
+                        <select name="category"
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded"></select>
                     </div>
                 </div>
-                <main class="max-w-7xl mx-auto px-6 py-8">
-                    ${activeTab === 'styles' ? renderStylesTab() : activeTab === 'categories' ? renderCategoriesTab() : activeTab === 'cleanup' ? renderCleanupTab() : activeTab === 'credits' ? renderCreditsTab() : activeTab === 'users' ? renderUsersTab() : renderAnalyticsTab()}
-                </main>
-                ${renderStyleModal()} ${renderCategoryModal()}
-            `;
-            if (activeTab === 'analytics') initCharts();
-        }
+                <textarea name="description" rows="2" placeholder="Description"
+                    class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded"></textarea>
 
-        function renderStylesTab() {
-            const featured = styles.filter(s => s.featured_in_carousel);
-            const filtered = activeTab === 'styles' && searchTerm ? styles.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())) : styles;
-
-            return `
-                <section class="mb-8 bg-slate-800/50 p-6 rounded-xl border border-yellow-500/20">
-                    <h2 class="text-lg font-bold text-yellow-500 mb-4">🎠 Carousel (${featured.length}/8)</h2>
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        ${featured.length ? featured.map(s => `
-                            <div class="bg-slate-900 rounded-lg overflow-hidden border border-slate-700 p-2">
-                                <div class="h-24 mb-2 bg-slate-800">${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : ''}</div>
-                                <p class="text-xs font-bold truncate">${s.name}</p>
-                                <button onclick="toggleCarousel('${s.id}', true)" class="w-full mt-1 py-1 bg-red-500/20 text-red-400 text-xs rounded">Remove</button>
-                            </div>
-                        `).join('') : '<p class="text-slate-500 col-span-full">Empty</p>'}
-                    </div>
-                </section>
-                <div class="flex justify-between mb-4">
-                    <input type="text" placeholder="Search..." oninput="searchTerm=this.value; renderApp()" value="${searchTerm}" class="bg-slate-900 border border-slate-700 px-3 py-2 rounded text-white">
-                    <button onclick="openAddStyleModal()" class="px-4 py-2 bg-indigo-600 rounded font-bold">+ New Style</button>
+                <!-- Carousel Section -->
+                <div class="bg-slate-900/50 p-4 rounded border border-slate-700">
+                    <h3 class="text-sm font-bold text-yellow-500 mb-2">🎠 Carousel Settings</h3>
+                    <textarea name="short_description" rows="2" placeholder="Carousel Marketing Text"
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded mb-2 text-sm"></textarea>
+                    <label class="flex items-center gap-2"><input type="checkbox" name="featured_in_carousel"> Show in
+                        Carousel</label>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    ${filtered.map(s => `
-                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden group">
-                            <div class="h-40 bg-slate-900 relative">
-                                ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-4xl">${s.icon || '🎨'}</div>`}
-                                <span class="absolute top-2 left-2 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">#${s.sort_order}</span>
-                            </div>
-                            <div class="p-3">
-                                <h3 class="font-bold truncate">${s.name}</h3>
-                                <p class="text-xs text-slate-400 truncate mb-2">${s?.category || '-'}</p>
-                                <div class="flex gap-2">
-                                    <button onclick='openEditStyleModal(${JSON.stringify(s).replace(/'/g, "&#39;")})' class="flex-1 py-1 bg-slate-700 text-xs rounded">Edit</button>
-                                     <button onclick="toggleCarousel('${s.id}', ${s.featured_in_carousel})" class="px-2 py-1 rounded text-lg transition-all ${s.featured_in_carousel ? 'text-yellow-400 scale-125' : 'text-slate-600 opacity-40 hover:opacity-100 hover:text-yellow-200 grayscale hover:grayscale-0'}">⭐</button>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
+
+                <textarea name="prompt_modifier" rows="2" placeholder="Prompt Modifier"
+                    class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded font-mono text-xs"></textarea>
+                <div class="grid grid-cols-3 gap-4">
+                    <input name="icon" placeholder="Icon"
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
+                    <input type="color" name="color" class="w-full h-10 bg-slate-900 border border-slate-700 rounded">
+                    <input type="number" name="sort_order"
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
                 </div>
-            `;
-        }
+                <label class="flex items-center gap-2"><input type="checkbox" name="requires_two_photos"> Requires 2
+                    Photos</label>
 
-        function renderCategoriesTab() {
-            return `
-                <div class="flex justify-between mb-6"><h2 class="text-xl font-bold">Categories</h2><button onclick="openAddCategoryModal()" class="px-4 py-2 bg-indigo-600 rounded">+ New</button></div>
-                <div class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
-                    <table class="w-full text-left text-sm text-slate-400">
-                        <thead class="bg-slate-900 uppercase text-xs"><tr><th class="px-6 py-4">ID</th><th class="px-6 py-4">Title</th><th class="px-6 py-4 text-right">Actions</th></tr></thead>
-                        <tbody class="divide-y divide-slate-700">
-                            ${categories.map(c => `<tr><td class="px-6 py-4 text-indigo-400">${c.id}</td><td class="px-6 py-4 text-white">${c.title}</td><td class="px-6 py-4 text-right"><button onclick='openEditCategoryModal(${JSON.stringify(c).replace(/'/g, "&#39;")})' class="text-indigo-400 mr-2">Edit</button><button onclick="deleteCategory('${c.id}')" class="text-red-400">Delete</button></td></tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>`;
-        }
-
-        function renderAnalyticsTab() {
-            return `
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 class="text-lg font-bold mb-4">Styles</h3><div class="h-64"><canvas id="stylesChart"></canvas></div></div>
-                    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700"><h3 class="text-lg font-bold mb-4">Daily</h3><div class="h-64"><canvas id="dailyChart"></canvas></div></div>
+                <div class="flex gap-4 pt-4 border-t border-slate-700">
+                    <button type="button" id="styleDeleteBtn" onclick="deleteStyle(editingStyle.id)"
+                        class="text-red-400">Delete</button>
+                    <div class="flex-1"></div>
+                    <button type="button" onclick="closeModals()" class="text-slate-300">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 px-6 py-2 rounded text-white font-bold">Save</button>
                 </div>
-                <div class="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                    <h3 class="text-lg font-bold mb-4">Top Users</h3>
-                    <div id="usersTableBody">Loading...</div>
+            </form>
+        </div>
+    </div>`;
+    }
+
+    function renderCategoryModal() {
+    return `
+    <div id="categoryModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-800 rounded-xl w-full max-w-md p-6 border border-slate-700">
+            <div class="flex justify-between mb-4">
+                <h2 id="categoryModalTitle" class="text-xl font-bold">Category</h2><button
+                    onclick="closeModals()">✕</button>
+            </div>
+            <form id="categoryForm" onsubmit="handleCategorySubmit(event)" class="space-y-4">
+                <input name="id" placeholder="ID" required
+                    class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
+                <input name="title" placeholder="Title" required
+                    class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
+                <input name="description" placeholder="Description"
+                    class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
+                <div class="grid grid-cols-2 gap-4">
+                    <input name="icon" placeholder="Icon"
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
+                    <input type="number" name="sort_order"
+                        class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
                 </div>
-            `;
-        }
+                <div class="flex gap-4 pt-4"><button type="button" id="categoryDeleteBtn"
+                        onclick="deleteCategory(editingCategory.id)" class="text-red-400">Delete</button>
+                    <div class="flex-1"></div><button type="submit"
+                        class="bg-indigo-600 px-6 py-2 rounded font-bold">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>`;
+    }
 
-        function renderCleanupTab() {
-            return `
-                <div class="max-w-xl mx-auto bg-slate-800 p-8 rounded-xl border border-red-500/30">
-                    <h2 class="text-xl font-bold text-red-400 mb-6">Storage Cleanup</h2>
-                    <div class="grid grid-cols-3 gap-4">
-                        <button onclick="handleCleanup(3)" class="p-4 bg-slate-900 border border-slate-700 rounded-xl hover:border-red-500">3 Days</button>
-                        <button onclick="handleCleanup(7)" class="p-4 bg-slate-900 border border-slate-700 rounded-xl hover:border-indigo-500">7 Days</button>
-                        <button onclick="handleCleanup(30)" class="p-4 bg-slate-900 border border-slate-700 rounded-xl hover:border-emerald-500">30 Days</button>
-                    </div>
-                </div>`;
-        }
+    function showStyleModal(data) {
+    const form = document.getElementById('styleForm');
+    const d = data || {};
+    form.style_id.value = d.style_id || '';
+    form.style_id.disabled = !!editingStyle;
+    form.name.value = d.name || '';
+    form.description.value = d.description || '';
+    form.short_description.value = d.short_description || '';
+    form.prompt_modifier.value = d.prompt_modifier || '';
+    form.icon.value = d.icon || '';
+    form.color.value = d.color || '#6366f1';
+    form.sort_order.value = d.sort_order || 0;
+    form.requires_two_photos.checked = d.requires_two_photos || false;
+    form.featured_in_carousel.checked = d.featured_in_carousel || false;
 
-        function renderCreditsTab() {
-            return `
-                <div class="max-w-xl mx-auto bg-slate-800 p-8 rounded-xl border border-emerald-500/30">
-                    <h2 class="text-xl font-bold text-emerald-400 mb-4">Manage Credits</h2>
-                    <form onsubmit="handleAddCredits(event)" class="space-y-4">
-                        <input type="text" id="targetUserId" placeholder="User UUID" required class="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white">
-                        <input type="number" id="creditAmount" placeholder="Amount (e.g. 50)" required class="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white">
-                        <button type="submit" class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-bold text-white">Update Credits</button>
-                    </form>
-                </div>`;
-        }
+    const catSelect = form.category;
+    catSelect.innerHTML = categories.map(c => `<option value="${c.id}" ${d.category===c.id ? 'selected' : '' }>
+        ${c.title}</option>`).join('');
 
-        function renderUsersTab() {
-            return `
-                <div class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
-                    <div class="p-6 border-b border-slate-700 flex justify-between items-center">
-                        <h2 class="text-xl font-bold">User Storage Management</h2>
-                        <button onclick="loadUserStats(); renderApp()" class="text-indigo-400 hover:text-white">Refresh</button>
-                    </div>
-                    <table class="w-full text-left text-sm text-slate-400">
-                        <thead class="bg-slate-900 uppercase text-xs">
-                            <tr>
-                                <th class="px-6 py-4">User ID</th>
-                                <th class="px-6 py-4 text-center">Images (Jobs)</th>
-                                <th class="px-6 py-4">Last Active</th>
-                                <th class="px-6 py-4 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-700">
-                            ${userStats.length ? userStats.map(u => `
-                                <tr class="hover:bg-slate-700/50">
-                                    <td class="px-6 py-4 font-mono text-xs text-indigo-400">
-                                        ${u.user_id}
-                                        <button onclick="navigator.clipboard.writeText('${u.user_id}')" class="ml-2 text-slate-500 hover:text-white" title="Copy ID">📋</button>
-                                    </td>
-                                    <td class="px-6 py-4 text-center text-white font-bold">${u.job_count}</td>
-                                    <td class="px-6 py-4 text-xs">${u.last_active ? new Date(u.last_active).toLocaleDateString() : '-'}</td>
-                                    <td class="px-6 py-4 text-right">
-                                        <button onclick="handleDeleteUserFiles('${u.user_id}')" class="px-3 py-1 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded border border-red-500/20 text-xs transition-colors">
-                                            🗑️ Delete All Images
-                                        </button>
-                                    </td>
-                                </tr>
-                            `).join('') : '<tr><td colspan="4" class="p-8 text-center">No users found</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>`;
-        }
+    document.getElementById('styleImagePreview').innerHTML = d.image_url ? `<img src="${d.image_url}"
+        class="w-full h-full object-cover">` : '';
+    document.getElementById('styleModalTitle').textContent = editingStyle ? 'Edit Style' : 'New Style';
+    document.getElementById('styleDeleteBtn').style.display = editingStyle ? 'block' : 'none';
+    document.getElementById('styleModal').classList.remove('hidden');
+    }
 
-        // --- Modals ---
-        function renderStyleModal() {
-            return `
-                <div id="styleModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-                    <div class="bg-slate-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-700 p-6">
-                        <div class="flex justify-between mb-6"><h2 id="styleModalTitle" class="text-xl font-bold">Edit Style</h2><button onclick="closeModals()">✕</button></div>
-                        <form id="styleForm" onsubmit="handleStyleSubmit(event)" class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div id="styleImagePreview" class="h-32 bg-slate-900 rounded mb-2 overflow-hidden"></div>
-                                    <input type="file" id="styleImageUpload" class="text-sm text-slate-400">
-                                </div>
-                                <div class="space-y-3">
-                                    <input name="style_id" placeholder="ID" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
-                                    <input name="name" placeholder="Name" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
-                                    <select name="category" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded"></select>
-                                </div>
-                            </div>
-                            <textarea name="description" rows="2" placeholder="Description" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded"></textarea>
-                            
-                            <!-- Carousel Section -->
-                             <div class="bg-slate-900/50 p-4 rounded border border-slate-700">
-                                <h3 class="text-sm font-bold text-yellow-500 mb-2">🎠 Carousel Settings</h3>
-                                <textarea name="short_description" rows="2" placeholder="Carousel Marketing Text" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded mb-2 text-sm"></textarea>
-                                <label class="flex items-center gap-2"><input type="checkbox" name="featured_in_carousel"> Show in Carousel</label>
-                            </div>
+    function showCategoryModal(data) {
+    const form = document.getElementById('categoryForm');
+    const d = data || {};
+    form.id.value = d.id || '';
+    form.id.readOnly = !!editingCategory;
+    form.title.value = d.title || '';
+    form.description.value = d.description || '';
+    form.icon.value = d.icon || '';
+    form.sort_order.value = d.sort_order || 0;
+    document.getElementById('categoryModalTitle').textContent = editingCategory ? 'Edit Category' : 'New Category';
+    document.getElementById('categoryDeleteBtn').style.display = editingCategory ? 'block' : 'none';
+    document.getElementById('categoryModal').classList.remove('hidden');
+    }
 
-                            <textarea name="prompt_modifier" rows="2" placeholder="Prompt Modifier" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded font-mono text-xs"></textarea>
-                            <div class="grid grid-cols-3 gap-4">
-                                <input name="icon" placeholder="Icon" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
-                                <input type="color" name="color" class="w-full h-10 bg-slate-900 border border-slate-700 rounded">
-                                <input type="number" name="sort_order" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
-                            </div>
-                            <label class="flex items-center gap-2"><input type="checkbox" name="requires_two_photos"> Requires 2 Photos</label>
-                            
-                            <div class="flex gap-4 pt-4 border-t border-slate-700">
-                                <button type="button" id="styleDeleteBtn" onclick="deleteStyle(editingStyle.id)" class="text-red-400">Delete</button>
-                                <div class="flex-1"></div>
-                                <button type="button" onclick="closeModals()" class="text-slate-300">Cancel</button>
-                                <button type="submit" class="bg-indigo-600 px-6 py-2 rounded text-white font-bold">Save</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>`;
-        }
+    function initCharts() {
+    if (!jobs.length) return document.getElementById('usersTableBody').innerHTML = 'No data';
 
-        function renderCategoryModal() {
-            return `
-                <div id="categoryModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-                    <div class="bg-slate-800 rounded-xl w-full max-w-md p-6 border border-slate-700">
-                        <div class="flex justify-between mb-4"><h2 id="categoryModalTitle" class="text-xl font-bold">Category</h2><button onclick="closeModals()">✕</button></div>
-                        <form id="categoryForm" onsubmit="handleCategorySubmit(event)" class="space-y-4">
-                            <input name="id" placeholder="ID" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
-                            <input name="title" placeholder="Title" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
-                            <input name="description" placeholder="Description" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
-                            <div class="grid grid-cols-2 gap-4">
-                                <input name="icon" placeholder="Icon" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
-                                <input type="number" name="sort_order" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded">
-                            </div>
-                            <div class="flex gap-4 pt-4"><button type="button" id="categoryDeleteBtn" onclick="deleteCategory(editingCategory.id)" class="text-red-400">Delete</button><div class="flex-1"></div><button type="submit" class="bg-indigo-600 px-6 py-2 rounded font-bold">Save</button></div>
-                        </form>
-                    </div>
-                </div>`;
-        }
+    // Users
+    const userCounts = {};
+    jobs.forEach(j => userCounts[j.user_id] = (userCounts[j.user_id] || 0) + 1);
+    const sortedUsers = Object.entries(userCounts).sort(([, a], [, b]) => b - a).slice(0, 50);
 
-        function showStyleModal(data) {
-            const form = document.getElementById('styleForm');
-            const d = data || {};
-            form.style_id.value = d.style_id || '';
-            form.style_id.disabled = !!editingStyle;
-            form.name.value = d.name || '';
-            form.description.value = d.description || '';
-            form.short_description.value = d.short_description || '';
-            form.prompt_modifier.value = d.prompt_modifier || '';
-            form.icon.value = d.icon || '';
-            form.color.value = d.color || '#6366f1';
-            form.sort_order.value = d.sort_order || 0;
-            form.requires_two_photos.checked = d.requires_two_photos || false;
-            form.featured_in_carousel.checked = d.featured_in_carousel || false;
+    document.getElementById('usersTableBody').innerHTML = `
+    <table class="w-full text-left text-sm text-slate-400">
+        ${sortedUsers.map(([uid, c], i) => `<tr>
+            <td class="p-2">#${i + 1}</td>
+            <td class="p-2 font-mono text-xs text-indigo-400">${uid}</td>
+            <td class="p-2 text-right text-white font-bold">${c}</td>
+        </tr>`).join('')}
+    </table>`;
 
-            const catSelect = form.category;
-            catSelect.innerHTML = categories.map(c => `<option value="${c.id}" ${d.category === c.id ? 'selected' : ''}>${c.title}</option>`).join('');
+    // Charts
+    const styleCounts = {}; jobs.forEach(j => styleCounts[j.style_name || 'U'] = (styleCounts[j.style_name || 'U'] || 0)
+    + 1);
+    const sortedStyles = Object.entries(styleCounts).sort(([, a], [, b]) => b - a).slice(0, 10);
 
-            document.getElementById('styleImagePreview').innerHTML = d.image_url ? `<img src="${d.image_url}" class="w-full h-full object-cover">` : '';
-            document.getElementById('styleModalTitle').textContent = editingStyle ? 'Edit Style' : 'New Style';
-            document.getElementById('styleDeleteBtn').style.display = editingStyle ? 'block' : 'none';
-            document.getElementById('styleModal').classList.remove('hidden');
-        }
+    new Chart(document.getElementById('stylesChart'), {
+    type: 'bar',
+    data: { labels: sortedStyles.map(s => s[0]), datasets: [{ label: 'Uses', data: sortedStyles.map(s => s[1]),
+    backgroundColor: '#6366f1' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
 
-        function showCategoryModal(data) {
-            const form = document.getElementById('categoryForm');
-            const d = data || {};
-            form.id.value = d.id || '';
-            form.id.readOnly = !!editingCategory;
-            form.title.value = d.title || '';
-            form.description.value = d.description || '';
-            form.icon.value = d.icon || '';
-            form.sort_order.value = d.sort_order || 0;
-            document.getElementById('categoryModalTitle').textContent = editingCategory ? 'Edit Category' : 'New Category';
-            document.getElementById('categoryDeleteBtn').style.display = editingCategory ? 'block' : 'none';
-            document.getElementById('categoryModal').classList.remove('hidden');
-        }
+    const daily = {};
+    for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i);
+    daily[d.toISOString().split('T')[0]] = 0; }
+    jobs.forEach(j => { const k = new Date(j.created_at).toISOString().split('T')[0]; if (daily[k] !== undefined)
+    daily[k]++; });
 
-        function initCharts() {
-            if (!jobs.length) return document.getElementById('usersTableBody').innerHTML = 'No data';
+    new Chart(document.getElementById('dailyChart'), {
+    type: 'line',
+    data: { labels: Object.keys(daily).map(d => d.slice(5)), datasets: [{ label: 'Jobs', data: Object.values(daily),
+    borderColor: '#10b981', tension: 0.3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
+    }
 
-            // Users
-            const userCounts = {};
-            jobs.forEach(j => userCounts[j.user_id] = (userCounts[j.user_id] || 0) + 1);
-            const sortedUsers = Object.entries(userCounts).sort(([, a], [, b]) => b - a).slice(0, 50);
-
-            document.getElementById('usersTableBody').innerHTML = `
-                <table class="w-full text-left text-sm text-slate-400">
-                    ${sortedUsers.map(([uid, c], i) => `<tr><td class="p-2">#${i + 1}</td><td class="p-2 font-mono text-xs text-indigo-400">${uid}</td><td class="p-2 text-right text-white font-bold">${c}</td></tr>`).join('')}
-                </table>`;
-
-            // Charts
-            const styleCounts = {}; jobs.forEach(j => styleCounts[j.style_name || 'U'] = (styleCounts[j.style_name || 'U'] || 0) + 1);
-            const sortedStyles = Object.entries(styleCounts).sort(([, a], [, b]) => b - a).slice(0, 10);
-
-            new Chart(document.getElementById('stylesChart'), {
-                type: 'bar',
-                data: { labels: sortedStyles.map(s => s[0]), datasets: [{ label: 'Uses', data: sortedStyles.map(s => s[1]), backgroundColor: '#6366f1' }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-            });
-
-            const daily = {};
-            for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); daily[d.toISOString().split('T')[0]] = 0; }
-            jobs.forEach(j => { const k = new Date(j.created_at).toISOString().split('T')[0]; if (daily[k] !== undefined) daily[k]++; });
-
-            new Chart(document.getElementById('dailyChart'), {
-                type: 'line',
-                data: { labels: Object.keys(daily).map(d => d.slice(5)), datasets: [{ label: 'Jobs', data: Object.values(daily), borderColor: '#10b981', tension: 0.3 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-            });
-        }
-
-        init();
+    init();
     </script>
 </body>
 
