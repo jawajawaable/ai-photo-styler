@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, ScrollView, Dimensions, ImageBackground, Alert } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, ScrollView, Dimensions, ImageBackground, Alert, StatusBar } from 'react-native';
 import { Text, Icon, ActivityIndicator } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '../services/supabaseClient';
 import * as FileSystem from 'expo-file-system/legacy';
+import PremiumLoading from '../components/PremiumLoading';
 
 const { width, height } = Dimensions.get('window');
 
-export default function StyleDetailScreen({ style, onBack, onContinue, userId }) {
+export default function StyleDetailScreen({ style, onBack, onContinue, userId, credits, onPurchasePress }) {
+    const insets = useSafeAreaInsets();
     const [image1, setImage1] = useState(null);
     const [image2, setImage2] = useState(null);
     const [creating, setCreating] = useState(false);
@@ -22,38 +25,64 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
         });
 
         if (!result.canceled) {
-            setImage(result.assets[0]);
+            const asset = result.assets[0];
+
+            // Image Optimization Logic
+            const actions = [];
+            const MAX_DIMENSION = 1080;
+
+            if (asset.width > MAX_DIMENSION || asset.height > MAX_DIMENSION) {
+                if (asset.width > asset.height) {
+                    actions.push({ resize: { width: MAX_DIMENSION } });
+                } else {
+                    actions.push({ resize: { height: MAX_DIMENSION } });
+                }
+            }
+
+            try {
+                const manipResult = await ImageManipulator.manipulateAsync(
+                    asset.uri,
+                    actions,
+                    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+                );
+                setImage(manipResult);
+            } catch (error) {
+                console.error('Image optimization failed:', error);
+                // Fallback to original if optimization fails
+                setImage(asset);
+            }
         }
     };
 
     const handleContinue = async () => {
         if (!image1) return;
+
+        if (!credits || credits < 1) {
+            Alert.alert(
+                '⭐ Yetersiz Kredi',
+                'Görsel oluşturmak için en az 1 krediniz olmalı.',
+                [
+                    { text: 'İptal', style: 'cancel' },
+                    { text: 'Kredi Al', onPress: () => onPurchasePress && onPurchasePress() }
+                ]
+            );
+            return;
+        }
         if (style.requires_two_photos && !image2) return;
 
         setCreating(true);
         try {
-            // Upload images to Supabase Storage
             const timestamp = Date.now();
             const image1Path = `inputs/${userId}/${timestamp}_1.jpg`;
 
-            // Read file as base64 using FileSystem
-            const base64Image1 = await FileSystem.readAsStringAsync(image1.uri, {
-                encoding: 'base64',
-            });
-
-            // Convert base64 to ArrayBuffer
+            const base64Image1 = await FileSystem.readAsStringAsync(image1.uri, { encoding: 'base64' });
             const binaryString1 = atob(base64Image1);
             const bytes1 = new Uint8Array(binaryString1.length);
-            for (let i = 0; i < binaryString1.length; i++) {
-                bytes1[i] = binaryString1.charCodeAt(i);
-            }
+            for (let i = 0; i < binaryString1.length; i++) bytes1[i] = binaryString1.charCodeAt(i);
 
             const { error: uploadError1 } = await supabase.storage
                 .from('style-images')
-                .upload(image1Path, bytes1.buffer, {
-                    contentType: 'image/jpeg',
-                    upsert: true,
-                });
+                .upload(image1Path, bytes1.buffer, { contentType: 'image/jpeg', upsert: true });
 
             if (uploadError1) throw uploadError1;
 
@@ -64,33 +93,21 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
             let image2Url = null;
             if (image2) {
                 const image2Path = `inputs/${userId}/${timestamp}_2.jpg`;
-
-                const base64Image2 = await FileSystem.readAsStringAsync(image2.uri, {
-                    encoding: 'base64',
-                });
-
+                const base64Image2 = await FileSystem.readAsStringAsync(image2.uri, { encoding: 'base64' });
                 const binaryString2 = atob(base64Image2);
                 const bytes2 = new Uint8Array(binaryString2.length);
-                for (let i = 0; i < binaryString2.length; i++) {
-                    bytes2[i] = binaryString2.charCodeAt(i);
-                }
+                for (let i = 0; i < binaryString2.length; i++) bytes2[i] = binaryString2.charCodeAt(i);
 
                 const { error: uploadError2 } = await supabase.storage
                     .from('style-images')
-                    .upload(image2Path, bytes2.buffer, {
-                        contentType: 'image/jpeg',
-                        upsert: true,
-                    });
+                    .upload(image2Path, bytes2.buffer, { contentType: 'image/jpeg', upsert: true });
 
                 if (uploadError2) throw uploadError2;
 
-                const { data: { publicUrl: url2 } } = supabase.storage
-                    .from('style-images')
-                    .getPublicUrl(image2Path);
+                const { data: { publicUrl: url2 } } = supabase.storage.from('style-images').getPublicUrl(image2Path);
                 image2Url = url2;
             }
 
-            // Create job
             const { data: job, error: jobError } = await supabase
                 .from('jobs')
                 .insert([{
@@ -101,20 +118,23 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
                     input_image2_url: image2Url,
                     prompt: style.prompt_modifier,
                     status: 'pending',
-                    estimated_completion: new Date(Date.now() + 60000).toISOString(), // 1 min from now
+                    estimated_completion: new Date(Date.now() + 60000).toISOString(),
                 }])
                 .select()
                 .single();
 
             if (jobError) throw jobError;
 
-            console.log('Job created successfully:', job.id);
+            try {
+                await fetch('https://ai-photo-styler-1-hozn.onrender.com/api/process-jobs', { method: 'POST' });
+            } catch (triggerError) {
+                console.log('Background trigger sent');
+            }
 
-            // Navigate to profile
             onContinue({ style, images: [image1, image2] });
         } catch (error) {
             console.error('Error creating job:', error);
-            Alert.alert('Hata', 'İşlem oluşturulamadı: ' + error.message);
+            Alert.alert('Hata', 'İşlem oluşturulamadı.');
         } finally {
             setCreating(false);
         }
@@ -130,13 +150,16 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
                 <Image source={{ uri: image.uri }} style={styles.uploadedImage} resizeMode="cover" />
             ) : (
                 <View style={styles.uploadPlaceholder}>
-                    <Icon source={icon} size={32} color="#666" />
+                    <View style={styles.iconCircle}>
+                        <Icon source={icon} size={28} color="#fff" />
+                    </View>
                     <Text style={styles.uploadText}>{label}</Text>
+                    <Text style={styles.uploadSubtext}>Seçmek için dokun</Text>
                 </View>
             )}
             {image && (
                 <View style={styles.editBadge}>
-                    <Icon source="pencil" size={16} color="#fff" />
+                    <Icon source="pencil" size={14} color="#000" />
                 </View>
             )}
         </TouchableOpacity>
@@ -144,8 +167,11 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
 
     return (
         <View style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent} bounces={false}>
-                {/* Header Image Section */}
+            <PremiumLoading visible={creating} />
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+
+            <ScrollView contentContainerStyle={styles.scrollContent} bounces={false} showsVerticalScrollIndicator={false}>
+                {/* Immersive Header Image */}
                 <View style={styles.headerContainer}>
                     <ImageBackground
                         source={{ uri: style.image_url || 'https://via.placeholder.com/400' }}
@@ -153,47 +179,62 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
                         resizeMode="cover"
                     >
                         <LinearGradient
-                            colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.4)', '#000']}
+                            colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)', '#000']}
                             style={styles.gradient}
                         >
-                            <SafeAreaView edges={['top']} style={styles.safeHeader}>
+                            <View style={[styles.headerTop, { paddingTop: insets.top + 10 }]}>
                                 <TouchableOpacity onPress={onBack} style={styles.closeButton}>
-                                    <Icon source="close" size={24} color="#000" />
+                                    <Icon source="arrow-left" size={24} color="#fff" />
                                 </TouchableOpacity>
-                            </SafeAreaView>
+
+                                <View style={styles.creditsPill}>
+                                    <Text style={styles.creditsValue}>{credits || 0}</Text>
+                                    <View style={styles.creditsDot} />
+                                </View>
+                            </View>
 
                             <View style={styles.headerTextContainer}>
-                                <Text variant="headlineMedium" style={styles.title}>{style.name}</Text>
-                                <Text variant="bodyMedium" style={styles.description}>
-                                    {style.description}
-                                </Text>
+                                <Text style={styles.title}>{style.name}</Text>
+                                <Text style={styles.description}>{style.description}</Text>
                             </View>
                         </LinearGradient>
                     </ImageBackground>
                 </View>
 
-                {/* Upload Section */}
+                {/* Content Section */}
                 <View style={styles.contentContainer}>
-                    <View style={styles.uploadGrid}>
-                        {renderUploadButton(
-                            image1,
-                            setImage1,
-                            "Senin fotoğrafın!",
-                            "account"
-                        )}
+                    {/* Tip Card */}
+                    <View style={styles.tipCard}>
+                        <LinearGradient
+                            colors={['rgba(16, 185, 129, 0.1)', 'rgba(16, 185, 129, 0.05)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.tipGradient}
+                        >
+                            <View style={styles.tipContent}>
+                                <View style={styles.tipIconContainer}>
+                                    <Icon source="lightbulb-on-outline" size={20} color="#10b981" />
+                                </View>
+                                <View style={styles.tipTextContainer}>
+                                    <Text style={styles.tipTitle}>Mükemmel Sonuç İçin</Text>
+                                    <Text style={styles.tipDescription}>
+                                        Yüzünüzün net göründüğü, aydınlık bir fotoğraf seçin. Gözlük veya şapka takmamaya özen gösterin.
+                                    </Text>
+                                </View>
+                            </View>
+                        </LinearGradient>
+                    </View>
 
-                        {style.requires_two_photos && renderUploadButton(
-                            image2,
-                            setImage2,
-                            "Partnerinin fotoğrafı!",
-                            "account-multiple"
-                        )}
+                    <Text style={styles.sectionTitle}>Fotoğraf Yükle</Text>
+                    <View style={styles.uploadGrid}>
+                        {renderUploadButton(image1, setImage1, "Senin Fotoğrafın", "account")}
+                        {style.requires_two_photos && renderUploadButton(image2, setImage2, "Partnerin", "account-group")}
                     </View>
                 </View>
             </ScrollView>
 
-            {/* Footer Action */}
-            <SafeAreaView edges={['bottom']} style={styles.footer}>
+            {/* Bottom Action Bar */}
+            <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
                 <TouchableOpacity
                     style={[
                         styles.continueButton,
@@ -202,19 +243,22 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
                     onPress={handleContinue}
                     disabled={!image1 || (style.requires_two_photos && !image2) || creating}
                 >
-                    {creating ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <>
-                            <Text style={styles.continueText}>Devam Et</Text>
-                            <View style={styles.priceTag}>
-                                <Icon source="star-four-points" size={16} color="#fff" />
-                                <Text style={styles.priceText}>40</Text>
+                    <LinearGradient
+                        colors={['#10b981', '#059669']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.gradientButton}
+                    >
+                        <View style={styles.buttonContent}>
+                            <Text style={styles.continueText}>Oluştur</Text>
+                            <View style={styles.priceContainer}>
+                                <Icon source="star-four-points" size={14} color="#fff" />
+                                <Text style={styles.priceText}>1</Text>
                             </View>
-                        </>
-                    )}
+                        </View>
+                    </LinearGradient>
                 </TouchableOpacity>
-            </SafeAreaView>
+            </View>
         </View>
     );
 }
@@ -222,11 +266,11 @@ export default function StyleDetailScreen({ style, onBack, onContinue, userId })
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#000',
     },
     scrollContent: {
         flexGrow: 1,
-        paddingBottom: 100,
+        paddingBottom: 120,
     },
     headerContainer: {
         height: height * 0.55,
@@ -240,17 +284,43 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'space-between',
     },
-    safeHeader: {
+    headerTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 10,
     },
     closeButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#fff',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.1)',
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    creditsPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        gap: 6,
+        borderWidth: 1.5,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    creditsValue: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#fff',
+    },
+    creditsDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#10b981',
     },
     headerTextContainer: {
         padding: 24,
@@ -258,18 +328,62 @@ const styles = StyleSheet.create({
     },
     title: {
         color: '#fff',
-        fontWeight: 'bold',
+        fontWeight: '900',
         marginBottom: 8,
-        fontSize: 28,
+        fontSize: 32,
+        letterSpacing: -0.5,
     },
     description: {
-        color: 'rgba(255,255,255,0.8)',
+        color: '#cbd5e1',
         fontSize: 16,
         lineHeight: 24,
     },
     contentContainer: {
         padding: 24,
-        marginTop: -20,
+        marginTop: -30,
+    },
+    tipCard: {
+        marginBottom: 24,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(16, 185, 129, 0.2)',
+    },
+    tipGradient: {
+        padding: 16,
+    },
+    tipContent: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    tipIconContainer: {
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        padding: 8,
+        borderRadius: 12,
+        height: 36,
+        width: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tipTextContainer: {
+        flex: 1,
+    },
+    tipTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#fff',
+        marginBottom: 4,
+    },
+    tipDescription: {
+        fontSize: 13,
+        color: '#9ca3af',
+        lineHeight: 18,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#fff',
+        marginBottom: 16,
     },
     uploadGrid: {
         flexDirection: 'row',
@@ -278,11 +392,11 @@ const styles = StyleSheet.create({
     uploadButton: {
         flex: 1,
         aspectRatio: 0.8,
-        backgroundColor: '#f5f5f5',
-        borderRadius: 16,
+        backgroundColor: '#1a1a1a',
+        borderRadius: 24,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: '#ddd',
+        borderColor: '#333',
     },
     uploadPlaceholder: {
         flex: 1,
@@ -290,11 +404,25 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: 16,
     },
+    iconCircle: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#262626',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
     uploadText: {
-        color: '#666',
+        color: '#fff',
         textAlign: 'center',
-        marginTop: 12,
-        fontSize: 14,
+        fontWeight: '600',
+        fontSize: 15,
+    },
+    uploadSubtext: {
+        color: '#666',
+        fontSize: 12,
+        marginTop: 4,
     },
     uploadedImage: {
         width: '100%',
@@ -302,52 +430,57 @@ const styles = StyleSheet.create({
     },
     editBadge: {
         position: 'absolute',
-        top: 8,
-        right: 8,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        padding: 6,
-        borderRadius: 12,
+        top: 10,
+        right: 10,
+        backgroundColor: '#fff',
+        padding: 8,
+        borderRadius: 100,
     },
     footer: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        padding: 24,
-        backgroundColor: '#fff',
+        paddingHorizontal: 24,
+        backgroundColor: 'rgba(0,0,0,0.9)',
+        paddingTop: 20,
         borderTopWidth: 1,
-        borderTopColor: '#e0e0e0',
+        borderTopColor: '#1a1a1a',
     },
     continueButton: {
-        backgroundColor: '#6200ee',
+        borderRadius: 100,
+        overflow: 'hidden',
+    },
+    gradientButton: {
         height: 56,
-        borderRadius: 28,
-        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 12,
     },
     disabledButton: {
-        backgroundColor: '#ccc',
-        opacity: 0.8,
+        opacity: 0.5,
+    },
+    buttonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     continueText: {
         color: '#fff',
         fontSize: 18,
-        fontWeight: 'bold',
+        fontWeight: '700',
     },
-    priceTag: {
+    priceContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
         backgroundColor: 'rgba(255,255,255,0.2)',
         paddingHorizontal: 8,
         paddingVertical: 2,
-        borderRadius: 8,
+        borderRadius: 12,
+        gap: 4,
     },
     priceText: {
         color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 16,
-    }
+        fontWeight: '700',
+        fontSize: 14,
+    },
 });

@@ -1,89 +1,79 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
-import { Text, TextInput, Button, Surface, useTheme } from 'react-native-paper';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, Dimensions, Animated, ActivityIndicator, Alert, Platform } from 'react-native';
+import { Text, Icon } from 'react-native-paper';
 import { supabase } from '../services/supabaseClient';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 export default function AuthScreen() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [isLogin, setIsLogin] = useState(true);
-    const theme = useTheme();
+    const pulseAnim = React.useRef(new Animated.Value(1)).current;
 
-    const handleAuth = async () => {
-        if (!email || !password) {
-            Alert.alert('Hata', 'Lütfen e-posta ve şifre girin.');
-            return;
-        }
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, { toValue: 1.2, duration: 3000, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1, duration: 3000, useNativeDriver: true }),
+            ])
+        ).start();
 
-        setLoading(true);
+        handleGuestLogin();
+    }, []);
+
+    const handleGuestLogin = async () => {
         try {
-            if (isLogin) {
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-                if (error) throw error;
-            } else {
-                const { error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                });
-                if (error) throw error;
-                Alert.alert('Başarılı', 'Kayıt olundu! Lütfen giriş yapın.');
-                setIsLogin(true);
+            const timestamp = new Date().getTime();
+            const random = Math.floor(Math.random() * 10000);
+            // Use local domain, alphanumeric only to prevent regex issues.
+            const guestEmail = `guest${timestamp}${random}@satriq.app`;
+            const guestPassword = `GuestPass${timestamp}!`;
+
+            const { data, error } = await supabase.auth.signUp({
+                email: guestEmail,
+                password: guestPassword,
+                options: {
+                    data: { is_guest: true }
+                }
+            });
+
+            if (error) throw error;
+
+            // Critical Check: If no session, it means Auto-Confirm is OFF and Supabase is sending emails (causing bounces).
+            if (!data.session) {
+                Alert.alert(
+                    'Kritik Ayar Eksik ⚠️',
+                    'Uygulama "Email Confirmation" beklediği için takıldı.\n\nMisafir girişinin çalışması ve maillerin "bounce" etmemesi için:\nSupabase > Authentication > Providers > Email > "Enable Email Confirmations" ayarını KAPATIN.',
+                    [{ text: 'Tekrar Dene', onPress: handleGuestLogin }]
+                );
             }
+            // Success: Auth state listener in App.js will redirect
         } catch (error) {
-            Alert.alert('Hata', error.message);
-        } finally {
-            setLoading(false);
+            Alert.alert('Bağlantı Hatası', 'Giriş yapılamadı: ' + error.message, [
+                { text: 'Tekrar Dene', onPress: handleGuestLogin }
+            ]);
         }
     };
 
     return (
         <View style={styles.container}>
-            <Surface style={styles.card} elevation={4}>
-                <Text variant="headlineMedium" style={styles.title}>
-                    {isLogin ? 'Giriş Yap' : 'Kayıt Ol'}
-                </Text>
+            <LinearGradient colors={['#000', '#0a0a0a', '#111']} style={StyleSheet.absoluteFill} />
 
-                <TextInput
-                    label="E-posta"
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    style={styles.input}
-                    mode="outlined"
-                />
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                <Animated.View style={[styles.blob, { transform: [{ scale: pulseAnim }], opacity: 0.15 }]}>
+                    <LinearGradient colors={['#10b981', 'transparent']} style={styles.blobGradient} start={{ x: 0.5, y: 0.5 }} end={{ x: 1, y: 1 }} />
+                </Animated.View>
+            </View>
 
-                <TextInput
-                    label="Şifre"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    style={styles.input}
-                    mode="outlined"
-                />
-
-                <Button
-                    mode="contained"
-                    onPress={handleAuth}
-                    loading={loading}
-                    disabled={loading}
-                    style={styles.button}
-                >
-                    {isLogin ? 'Giriş Yap' : 'Kayıt Ol'}
-                </Button>
-
-                <Button
-                    mode="text"
-                    onPress={() => setIsLogin(!isLogin)}
-                    style={styles.switchButton}
-                >
-                    {isLogin ? 'Hesabın yok mu? Kayıt Ol' : 'Zaten hesabın var mı? Giriş Yap'}
-                </Button>
-            </Surface>
+            <View style={styles.content}>
+                <View style={styles.logoContainer}>
+                    <Text style={styles.logoText}>Satrik</Text>
+                    <View style={styles.logoIconWrapper}>
+                        <Icon source="star" size={24} color="#10b981" />
+                    </View>
+                </View>
+                <ActivityIndicator size="large" color="#10b981" style={{ marginTop: 40 }} />
+                <Text style={styles.loadingText}>Başlatılıyor...</Text>
+            </View>
         </View>
     );
 }
@@ -91,28 +81,46 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#000',
         justifyContent: 'center',
-        padding: 20,
-        backgroundColor: '#f5f5f5',
+        alignItems: 'center',
     },
-    card: {
-        padding: 20,
-        borderRadius: 10,
-        backgroundColor: 'white',
+    content: {
+        alignItems: 'center',
+        zIndex: 10,
     },
-    title: {
-        textAlign: 'center',
-        marginBottom: 20,
-        fontWeight: 'bold',
+    logoContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
-    input: {
-        marginBottom: 12,
+    logoText: {
+        fontSize: 42,
+        fontWeight: '800',
+        color: '#fff',
+        fontFamily: Platform.select({ ios: 'Arial Rounded MT Bold', android: 'sans-serif-rounded' }),
+        letterSpacing: -1,
     },
-    button: {
-        marginTop: 10,
-        paddingVertical: 6,
+    logoIconWrapper: {
+        marginTop: 4,
+        marginLeft: -4,
+        transform: [{ rotate: '15deg' }]
     },
-    switchButton: {
-        marginTop: 10,
-    }
+    loadingText: {
+        color: '#666',
+        marginTop: 16,
+        fontSize: 14,
+        letterSpacing: 1,
+    },
+    blob: {
+        width: width * 1.5,
+        height: width * 1.5,
+        borderRadius: width,
+        position: 'absolute',
+        top: -width * 0.4,
+        left: -width * 0.2,
+    },
+    blobGradient: {
+        flex: 1,
+        borderRadius: width,
+    },
 });

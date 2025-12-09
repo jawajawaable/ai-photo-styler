@@ -11,9 +11,13 @@ import ResultDetailScreen from './src/screens/ResultDetailScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AdminScreen from './src/screens/AdminScreen';
+
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import PurchaseScreen from './src/screens/PurchaseScreen';
+import CategoryScreen from './src/screens/CategoryScreen';
+import CategoryDetailScreen from './src/screens/CategoryDetailScreen';
 import { supabase } from './src/services/supabaseClient';
+import SplashScreen from './src/screens/SplashScreen';
 
 const theme = {
   ...MD3LightTheme,
@@ -31,22 +35,38 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [selectedImages, setSelectedImages] = useState([]); // Array of images
   const [selectedStyle, setSelectedStyle] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [returnScreen, setReturnScreen] = useState('categories');
   const [session, setSession] = useState(null);
   const [credits, setCredits] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(null);
+  const [isShowSplash, setIsShowSplash] = useState(true);
 
   useEffect(() => {
     checkOnboarding();
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchCredits(session.user.id);
+      if (session) {
+        fetchCredits(session.user.id);
+        setCurrentScreen('home');
+      }
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchCredits(session.user.id);
+      if (session) {
+        fetchCredits(session.user.id);
+        setCurrentScreen('home');
+      } else if (_event === 'SIGNED_OUT') {
+        setCredits(null);
+        setSelectedImages([]);
+        setSelectedStyle(null);
+        setCurrentScreen('home'); // Reset to home for next login
+      }
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const checkOnboarding = async () => {
@@ -85,6 +105,7 @@ export default function App() {
     setSelectedImages(images);
     // Job will be created in StyleDetailScreen
     // Navigate to profile to see the job
+    if (session) fetchCredits(session.user.id);
     setCurrentScreen('profile');
   };
 
@@ -112,6 +133,12 @@ export default function App() {
     setCurrentScreen('purchase');
   };
 
+  const navigateToCategoryDetail = (category, fromScreen = 'categories') => {
+    setSelectedCategory(category);
+    setReturnScreen(fromScreen);
+    setCurrentScreen('category-detail');
+  };
+
   // Custom Bottom Navigation Component
   const BottomNav = () => (
     <View style={styles.bottomNav}>
@@ -129,14 +156,14 @@ export default function App() {
 
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => {
-          // "One Shot" action - maybe open camera or just go to upload?
-          // For now, let's make it go to home but maybe scroll to upload if we had it
-          setCurrentScreen('home');
-        }}
+        onPress={() => setCurrentScreen('categories')}
       >
-        <Icon source="camera-plus-outline" size={24} color="#666" />
-        <Text style={styles.navText}>Hızlı Yap</Text>
+        <Icon
+          source={currentScreen === 'categories' ? "view-grid" : "view-grid-outline"}
+          size={24}
+          color={currentScreen === 'categories' ? '#fff' : '#666'}
+        />
+        <Text style={[styles.navText, currentScreen === 'categories' && styles.navTextActive]}>Stiller</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -154,6 +181,7 @@ export default function App() {
   );
 
   const renderScreen = () => {
+    if (isShowSplash) return <SplashScreen onFinish={() => setIsShowSplash(false)} />;
     if (showOnboarding === null) return null;
     if (showOnboarding) return <OnboardingScreen onComplete={handleOnboardingComplete} />;
     if (!session) return <AuthScreen />;
@@ -166,6 +194,8 @@ export default function App() {
             userId={session.user.id}
             credits={credits}
             onProfilePress={navigateToProfile}
+            onPurchasePress={() => setCurrentScreen('purchase')}
+            onSelectCategory={(category) => navigateToCategoryDetail(category, 'home')}
           />
         );
       case 'style-detail':
@@ -173,8 +203,10 @@ export default function App() {
           <StyleDetailScreen
             style={selectedStyle}
             userId={session.user.id}
+            credits={credits}
             onBack={navigateHome}
             onContinue={navigateToResult}
+            onPurchasePress={() => setCurrentScreen('purchase')}
           />
         );
       case 'style-result':
@@ -216,6 +248,7 @@ export default function App() {
           <PurchaseScreen
             onBack={navigateToProfile}
             credits={credits}
+            onPurchaseSuccess={() => session && fetchCredits(session.user.id)}
           />
         );
       case 'admin':
@@ -224,6 +257,21 @@ export default function App() {
             userId={session.user.id}
             onBack={navigateHome}
             credits={credits}
+          />
+        );
+      case 'categories':
+        return (
+          <CategoryScreen
+            onSelectCategory={navigateToCategoryDetail}
+            onStylePress={navigateToStyleDetail}
+          />
+        );
+      case 'category-detail':
+        return (
+          <CategoryDetailScreen
+            category={selectedCategory}
+            onBack={() => setCurrentScreen(returnScreen)}
+            onStyleSelected={navigateToStyleDetail}
           />
         );
       default:
@@ -238,7 +286,7 @@ export default function App() {
           {renderScreen()}
 
           {/* Show Bottom Nav only on main screens */}
-          {session && !showOnboarding && ['home', 'profile'].includes(currentScreen) && (
+          {session && !showOnboarding && ['home', 'profile', 'categories'].includes(currentScreen) && (
             <BottomNav />
           )}
         </View>

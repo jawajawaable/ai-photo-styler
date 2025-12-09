@@ -113,20 +113,37 @@ module.exports = function (app, supabase, genAI, MODEL_NAME) {
                     const response = await result.response;
                     const candidates = response.candidates || [];
 
-                    if (candidates.length === 0 || !candidates[0].content || !candidates[0].content.parts) {
-                        throw new Error('No valid response from Gemini API');
+                    if (candidates.length === 0) {
+                        console.error('Gemini Response:', JSON.stringify(response, null, 2));
+                        throw new Error(`No candidates in response. Feedback: ${JSON.stringify(response.promptFeedback)}`);
+                    }
+
+                    const candidate = candidates[0];
+                    if (candidate.finishReason !== 'STOP') {
+                        console.warn(`Gemini Finish Reason: ${candidate.finishReason}`);
+                        if (candidate.finishReason === 'SAFETY') {
+                            throw new Error('Image generation triggered safety filters.');
+                        }
                     }
 
                     let generatedImageData = null;
-                    for (const part of candidates[0].content.parts) {
-                        if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {
-                            generatedImageData = part.inlineData.data;
-                            break;
+                    if (candidate.content && candidate.content.parts) {
+                        for (const part of candidate.content.parts) {
+                            if (part.inlineData && part.inlineData.mimeType.startsWith('image/')) {
+                                generatedImageData = part.inlineData.data;
+                                break;
+                            }
                         }
                     }
 
                     if (!generatedImageData) {
-                        throw new Error('No image in response');
+                        console.error('Full Candidate:', JSON.stringify(candidate, null, 2));
+                        // Check for text refusal
+                        const textPart = candidate.content?.parts?.find(p => p.text)?.text;
+                        if (textPart) {
+                            throw new Error(`Model refused/failed content: "${textPart.substring(0, 100)}..."`);
+                        }
+                        throw new Error(`No image in response. FinishReason: ${candidate.finishReason}`);
                     }
 
                     // Upload result to Supabase Storage
@@ -162,8 +179,13 @@ module.exports = function (app, supabase, genAI, MODEL_NAME) {
                         })
                         .eq('id', job.id);
 
+
                     results.push({ id: job.id, status: 'success' });
                     console.log(`✅ Job ${job.id} completed successfully`);
+
+                    // Rate Limit Protection: Wait 5 seconds between jobs
+                    console.log('⏳ Waiting 5s for rate limit...');
+                    await new Promise(resolve => setTimeout(resolve, 5000));
 
                 } catch (jobError) {
                     console.error(`❌ Job ${job.id} failed:`, jobError);
