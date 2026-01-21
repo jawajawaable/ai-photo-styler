@@ -96,8 +96,8 @@
 <body class="bg-slate-900 text-white min-h-screen pb-20">
     <div id="app" class="p-4 text-center min-h-screen flex items-center justify-center">
         <div>
-            <div class="spinner text-4xl mb-4">⚙️</div>
-            <h1 class="text-xl font-bold text-indigo-400">Yükleniyor...</h1>
+            <div class="spinner text-4xl mb-4">âš™ï¸</div>
+            <h1 class="text-xl font-bold text-indigo-400">YÃ¼kleniyor...</h1>
         </div>
     </div>
 
@@ -118,6 +118,10 @@
         let appConfig = [];
         let userSearchTerm = '';
         let isLoading = false;
+        let editingStyle = null;
+        let showStyleModal = false;
+        let currentUserDetail = null;
+        let currentUserJobs = [];
 
         // === AUTH ===
         async function checkIsAdmin(email) {
@@ -134,11 +138,11 @@
                 const isAdmin = await checkIsAdmin(email);
                 if (!isAdmin) {
                     await sb.auth.signOut();
-                    throw new Error('Bu hesap admin değil!');
+                    throw new Error('Bu hesap admin deÄŸil!');
                 }
                 init();
             } catch (e) {
-                alert('Giriş hatası: ' + e.message);
+                alert('GiriÅŸ hatasÄ±: ' + e.message);
                 showLoading(false);
             }
         }
@@ -168,7 +172,7 @@
                     renderLogin();
                 }
             } catch (e) {
-                alert('Başlatma hatası: ' + e.message);
+                alert('BaÅŸlatma hatasÄ±: ' + e.message);
                 renderLogin();
             }
             showLoading(false);
@@ -298,44 +302,44 @@
         async function toggleCarousel(styleId, currentStatus) {
             const featuredCount = styles.filter(s => s.featured_in_carousel).length;
             if (!currentStatus && featuredCount >= 8) {
-                toast('⚠️ Max 8 stil carousel\'de olabilir!');
+                toast('âš ï¸ Max 8 stil carousel\'de olabilir!');
                 return;
             }
             await sb.from('styles').update({ featured_in_carousel: !currentStatus }).eq('id', styleId);
             await loadData();
             renderApp();
-            toast(currentStatus ? 'Carousel\'den çıkarıldı' : 'Carousel\'e eklendi ✨');
+            toast(currentStatus ? 'Carousel\'den Ã§Ä±karÄ±ldÄ±' : 'Carousel\'e eklendi âœ¨');
         }
 
         async function toggleTrending(styleId, currentStatus) {
             await sb.from('styles').update({ is_trending: !currentStatus }).eq('id', styleId);
             await loadData();
             renderApp();
-            toast(currentStatus ? 'Trending kapatıldı' : 'Trending açıldı 🔥');
+            toast(currentStatus ? 'Trending kapatÄ±ldÄ±' : 'Trending aÃ§Ä±ldÄ± ğŸ”¥');
         }
 
         async function handleResolveReport(id) {
             await sb.from('reports').update({ status: 'resolved' }).eq('id', id);
             await loadReports();
             renderApp();
-            toast('Rapor çözüldü ✓');
+            toast('Rapor Ã§Ã¶zÃ¼ldÃ¼ âœ“');
         }
 
         async function handleDeleteReportedJob(reportId, jobId) {
-            if (!confirm('Bu görseli ve raporu silmek istediğinize emin misiniz?')) return;
+            if (!confirm('Bu gÃ¶rseli ve raporu silmek istediÄŸinize emin misiniz?')) return;
             await sb.from('jobs').delete().eq('id', jobId);
             await sb.from('reports').delete().eq('id', reportId);
             await loadReports();
             renderApp();
-            toast('Görsel silindi 🗑️');
+            toast('GÃ¶rsel silindi ğŸ—‘ï¸');
         }
 
         async function handleQuickAddCredits(userId) {
-            const amount = prompt("Eklenecek kredi miktarı:", "50");
+            const amount = prompt("Eklenecek kredi miktarÄ±:", "50");
             if (!amount) return;
             const parsed = parseInt(amount);
             if (isNaN(parsed) || parsed === 0) {
-                toast("Geçersiz miktar");
+                toast("GeÃ§ersiz miktar");
                 return;
             }
             try {
@@ -352,7 +356,7 @@
         async function handleUpdateConfig(key, value) {
             try {
                 await sb.from('app_config').update({ value }).eq('key', key);
-                toast('Config güncellendi ✓');
+                toast('Config gÃ¼ncellendi âœ“');
             } catch (e) {
                 alert('Hata: ' + e.message);
             }
@@ -364,18 +368,18 @@
                 <div class="min-h-screen flex items-center justify-center p-6">
                     <div class="w-full max-w-sm">
                         <div class="text-center mb-8">
-                            <div class="text-5xl mb-4">🎨</div>
+                            <div class="text-5xl mb-4">ğŸ¨</div>
                             <h1 class="text-2xl font-bold">Satriq<span class="text-indigo-400">Admin</span></h1>
-                            <p class="text-slate-500 text-sm mt-2">Mobil Yönetim Paneli</p>
+                            <p class="text-slate-500 text-sm mt-2">Mobil YÃ¶netim Paneli</p>
                         </div>
                         <form onsubmit="event.preventDefault(); handleLogin(this.email.value, this.password.value);" class="space-y-4">
                             <input type="email" name="email" placeholder="Email" required
                                 class="w-full px-4 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white text-lg focus:border-indigo-500 focus:outline-none">
-                            <input type="password" name="password" placeholder="Şifre" required
+                            <input type="password" name="password" placeholder="Åifre" required
                                 class="w-full px-4 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white text-lg focus:border-indigo-500 focus:outline-none">
                             <button type="submit" 
                                 class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl font-bold text-lg transition-colors">
-                                Giriş Yap
+                                GiriÅŸ Yap
                             </button>
                         </form>
                     </div>
@@ -385,11 +389,11 @@
 
         function renderApp() {
             const tabs = [
-                { id: 'dashboard', icon: '📊', label: 'Panel' },
-                { id: 'styles', icon: '🎨', label: 'Stiller' },
-                { id: 'users', icon: '👥', label: 'Users' },
-                { id: 'reports', icon: '🚩', label: 'Raporlar' },
-                { id: 'config', icon: '⚙️', label: 'Config' }
+                { id: 'dashboard', icon: 'ğŸ“Š', label: 'Panel' },
+                { id: 'styles', icon: 'ğŸ¨', label: 'Stiller' },
+                { id: 'categories', icon: 'ï¿½', label: 'Kategori' },
+                { id: 'users', icon: 'ï¿½', label: 'Users' },
+                { id: 'more', icon: 'â‹¯', label: 'Daha' }
             ];
 
             document.getElementById('app').innerHTML = `
@@ -398,7 +402,7 @@
                     <div class="flex items-center justify-between px-4 py-3">
                         <h1 class="text-lg font-bold">Satriq<span class="text-indigo-400">Admin</span></h1>
                         <button onclick="handleLogout()" class="text-slate-400 hover:text-white text-sm px-3 py-1.5 rounded-lg bg-slate-700/50">
-                            Çıkış
+                            Ã‡Ä±kÄ±ÅŸ
                         </button>
                     </div>
                 </header>
@@ -427,9 +431,13 @@
             switch (activeTab) {
                 case 'dashboard': return renderDashboard();
                 case 'styles': return renderStyles();
+                case 'categories': return renderCategories();
                 case 'users': return renderUsers();
                 case 'reports': return renderReports();
                 case 'config': return renderConfig();
+                case 'analytics': return renderAnalytics();
+                case 'cleanup': return renderCleanup();
+                case 'more': return renderMore();
                 default: return renderDashboard();
             }
         }
@@ -449,68 +457,68 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div class="bg-gradient-to-br from-indigo-600 to-indigo-800 p-4 rounded-2xl">
                             <div class="text-3xl font-bold">${todayJobs}</div>
-                            <div class="text-indigo-200 text-sm">Bugün İşlem</div>
+                            <div class="text-indigo-200 text-sm">BugÃ¼n Ä°ÅŸlem</div>
                         </div>
                         <div class="bg-gradient-to-br from-emerald-600 to-emerald-800 p-4 rounded-2xl">
                             <div class="text-3xl font-bold">${totalUsers}</div>
-                            <div class="text-emerald-200 text-sm">Toplam Kullanıcı</div>
+                            <div class="text-emerald-200 text-sm">Toplam KullanÄ±cÄ±</div>
                         </div>
                         <div class="bg-gradient-to-br from-amber-600 to-amber-800 p-4 rounded-2xl">
                             <div class="text-3xl font-bold">${activeUsers}</div>
-                            <div class="text-amber-200 text-sm">Aktif Kullanıcı</div>
+                            <div class="text-amber-200 text-sm">Aktif KullanÄ±cÄ±</div>
                         </div>
                         <div class="bg-gradient-to-br from-purple-600 to-purple-800 p-4 rounded-2xl">
                             <div class="text-3xl font-bold">${styles.length}</div>
-                            <div class="text-purple-200 text-sm">Stil Sayısı</div>
+                            <div class="text-purple-200 text-sm">Stil SayÄ±sÄ±</div>
                         </div>
                     </div>
 
                     <!-- Carousel Status -->
                     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="font-bold">✨ Carousel</h3>
+                            <h3 class="font-bold">âœ¨ Carousel</h3>
                             <span class="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-full">${featuredCount}/8</span>
                         </div>
                         <div class="flex gap-2 overflow-x-auto pb-2">
                             ${styles.filter(s => s.featured_in_carousel).map(s => `
                                 <div class="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-slate-700">
-                                    ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center">🎨</div>`}
+                                    ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center">ğŸ¨</div>`}
                                 </div>
-                            `).join('') || '<div class="text-slate-500 text-sm py-4">Carousel boş</div>'}
+                            `).join('') || '<div class="text-slate-500 text-sm py-4">Carousel boÅŸ</div>'}
                         </div>
                     </div>
 
                     <!-- Pending Reports -->
                     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="font-bold">🚩 Bekleyen Raporlar</h3>
+                            <h3 class="font-bold">ğŸš© Bekleyen Raporlar</h3>
                             <span class="text-xs ${reports.length > 0 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-400'} px-2 py-1 rounded-full">${reports.length}</span>
                         </div>
                         ${reports.length > 0
-                    ? `<button onclick="switchTab('reports')" class="w-full py-3 bg-red-500/10 text-red-400 rounded-xl font-medium">Raporları Gör →</button>`
-                    : `<div class="text-slate-500 text-sm">Bekleyen rapor yok ✓</div>`
+                    ? `<button onclick="switchTab('reports')" class="w-full py-3 bg-red-500/10 text-red-400 rounded-xl font-medium">RaporlarÄ± GÃ¶r â†’</button>`
+                    : `<div class="text-slate-500 text-sm">Bekleyen rapor yok âœ“</div>`
                 }
                     </div>
 
                     <!-- Recent Activity -->
                     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
-                        <h3 class="font-bold mb-3">⚡ Son İşlemler</h3>
+                        <h3 class="font-bold mb-3">âš¡ Son Ä°ÅŸlemler</h3>
                         <div class="space-y-2">
                             ${jobs.slice(0, 5).map(j => {
                     const style = styles.find(s => s.style_id === j.style_id || s.id === j.style_id);
                     return `
                                     <div class="flex items-center gap-3 p-2 bg-slate-700/50 rounded-xl">
                                         <div class="w-10 h-10 rounded-lg bg-slate-600 overflow-hidden shrink-0">
-                                            ${style?.image_url ? `<img src="${style.image_url}" class="w-full h-full object-cover">` : '🎨'}
+                                            ${style?.image_url ? `<img src="${style.image_url}" class="w-full h-full object-cover">` : 'ğŸ¨'}
                                         </div>
                                         <div class="flex-1 min-w-0">
                                             <div class="text-sm font-medium truncate">${style?.name || 'Bilinmeyen'}</div>
                                             <div class="text-xs text-slate-500">${new Date(j.created_at).toLocaleString('tr-TR')}</div>
                                         </div>
-                                        <div class="text-xs ${j.status === 'completed' ? 'text-emerald-400' : 'text-amber-400'}">${j.status === 'completed' ? '✓' : '...'}</div>
+                                        <div class="text-xs ${j.status === 'completed' ? 'text-emerald-400' : 'text-amber-400'}">${j.status === 'completed' ? 'âœ“' : '...'}</div>
                                     </div>
                                 `;
-                }).join('') || '<div class="text-slate-500 text-sm">Henüz işlem yok</div>'}
+                }).join('') || '<div class="text-slate-500 text-sm">HenÃ¼z iÅŸlem yok</div>'}
                         </div>
                     </div>
                 </div>
@@ -525,27 +533,27 @@
                     <!-- Featured Section -->
                     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="font-bold">✨ Carousel (${featured.length}/8)</h3>
+                            <h3 class="font-bold">âœ¨ Carousel (${featured.length}/8)</h3>
                         </div>
                         <div class="flex gap-2 overflow-x-auto pb-2">
                             ${featured.map(s => `
                                 <div class="shrink-0 relative pressable" onclick="toggleCarousel('${s.id}', true)">
                                     <div class="w-20 h-20 rounded-xl overflow-hidden bg-slate-700 border-2 border-indigo-500">
-                                        ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-2xl">🎨</div>`}
+                                        ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-2xl">ğŸ¨</div>`}
                                     </div>
-                                    <div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center">✕</div>
+                                    <div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center">âœ•</div>
                                 </div>
-                            `).join('') || '<div class="text-slate-500 text-sm py-4 w-full text-center">Carousel boş - aşağıdan stil ekleyin</div>'}
+                            `).join('') || '<div class="text-slate-500 text-sm py-4 w-full text-center">Carousel boÅŸ - aÅŸaÄŸÄ±dan stil ekleyin</div>'}
                         </div>
                     </div>
 
                     <!-- All Styles -->
-                    <h3 class="font-bold text-lg">Tüm Stiller (${styles.length})</h3>
+                    <h3 class="font-bold text-lg">TÃ¼m Stiller (${styles.length})</h3>
                     <div class="space-y-2">
                         ${styles.map(s => `
                             <div class="bg-slate-800 rounded-xl p-3 border border-slate-700 flex items-center gap-3 pressable">
                                 <div class="w-14 h-14 rounded-lg overflow-hidden bg-slate-700 shrink-0">
-                                    ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-xl">🎨</div>`}
+                                    ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-xl">ğŸ¨</div>`}
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <div class="font-medium truncate">${s.name}</div>
@@ -554,11 +562,11 @@
                                 <div class="flex gap-1">
                                     <button onclick="toggleCarousel('${s.id}', ${s.featured_in_carousel})" 
                                         class="w-10 h-10 rounded-lg flex items-center justify-center text-lg ${s.featured_in_carousel ? 'bg-indigo-500' : 'bg-slate-700'}">
-                                        ✨
+                                        âœ¨
                                     </button>
                                     <button onclick="toggleTrending('${s.id}', ${s.is_trending})" 
                                         class="w-10 h-10 rounded-lg flex items-center justify-center text-lg ${s.is_trending ? 'bg-orange-500' : 'bg-slate-700'}">
-                                        🔥
+                                        ğŸ”¥
                                     </button>
                                 </div>
                             </div>
@@ -623,10 +631,10 @@
                                     </div>
                                 </div>
                             </div>
-                        `).join('') || '<div class="text-center text-slate-500 py-8">Kullanıcı bulunamadı</div>'}
+                        `).join('') || '<div class="text-center text-slate-500 py-8">KullanÄ±cÄ± bulunamadÄ±</div>'}
                     </div>
 
-                    ${filtered.length >= 50 ? '<div class="text-center text-slate-500 text-sm py-4">İlk 50 kullanıcı gösteriliyor. Aramayı daraltın.</div>' : ''}
+                    ${filtered.length >= 50 ? '<div class="text-center text-slate-500 text-sm py-4">Ä°lk 50 kullanÄ±cÄ± gÃ¶steriliyor. AramayÄ± daraltÄ±n.</div>' : ''}
                 </div>
             `;
         }
@@ -635,13 +643,13 @@
             return `
                 <div class="space-y-4">
                     <div class="flex items-center justify-between">
-                        <h2 class="text-lg font-bold">🚩 Raporlar</h2>
+                        <h2 class="text-lg font-bold">ğŸš© Raporlar</h2>
                         <span class="text-xs ${reports.length > 0 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-400'} px-2 py-1 rounded-full">${reports.length} bekleyen</span>
                     </div>
 
                     ${reports.length === 0 ? `
                         <div class="text-center py-12">
-                            <div class="text-5xl mb-4">✅</div>
+                            <div class="text-5xl mb-4">âœ…</div>
                             <div class="text-slate-400">Bekleyen rapor yok!</div>
                         </div>
                     ` : reports.map(r => `
@@ -657,7 +665,7 @@
                             <div class="p-4 space-y-3">
                                 <div class="flex justify-between text-sm">
                                     <span class="text-slate-400">Sebep:</span>
-                                    <span class="font-medium">${r.reason || 'Belirtilmemiş'}</span>
+                                    <span class="font-medium">${r.reason || 'BelirtilmemiÅŸ'}</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
                                     <span class="text-slate-400">Tarih:</span>
@@ -668,11 +676,11 @@
                                 <div class="grid grid-cols-2 gap-2 pt-2">
                                     <button onclick="handleResolveReport('${r.id}')" 
                                         class="py-3 bg-emerald-500/20 text-emerald-400 rounded-xl font-medium">
-                                        ✓ Çözüldü
+                                        âœ“ Ã‡Ã¶zÃ¼ldÃ¼
                                     </button>
                                     <button onclick="handleDeleteReportedJob('${r.id}', '${r.job_id}')" 
                                         class="py-3 bg-red-500/20 text-red-400 rounded-xl font-medium">
-                                        🗑️ Sil
+                                        ğŸ—‘ï¸ Sil
                                     </button>
                                 </div>
                             </div>
@@ -685,11 +693,11 @@
         function renderConfig() {
             return `
                 <div class="space-y-4">
-                    <h2 class="text-lg font-bold">⚙️ Uygulama Ayarları</h2>
+                    <h2 class="text-lg font-bold">âš™ï¸ Uygulama AyarlarÄ±</h2>
 
                     ${appConfig.length === 0 ? `
                         <div class="text-center py-8 text-slate-500">
-                            Config yükleniyor veya boş...
+                            Config yÃ¼kleniyor veya boÅŸ...
                         </div>
                     ` : appConfig.map(c => `
                         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
@@ -709,18 +717,205 @@
 
                     <!-- Quick Actions -->
                     <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 mt-6">
-                        <h3 class="font-bold mb-3">🔧 Hızlı İşlemler</h3>
+                        <h3 class="font-bold mb-3">ğŸ”§ HÄ±zlÄ± Ä°ÅŸlemler</h3>
                         <button onclick="location.reload()" 
                             class="w-full py-3 bg-slate-700 text-white rounded-xl font-medium mb-2">
-                            🔄 Sayfayı Yenile
+                            ğŸ”„ SayfayÄ± Yenile
                         </button>
                         <button onclick="loadData().then(() => { renderApp(); toast('Veriler yenilendi!'); })" 
                             class="w-full py-3 bg-indigo-500/20 text-indigo-400 rounded-xl font-medium">
-                            🔃 Verileri Yenile
+                            ğŸ”ƒ Verileri Yenile
                         </button>
                     </div>
                 </div>
             `;
+        }
+
+        // === NEW RENDER FUNCTIONS ===
+        function renderCategories() {
+            return `
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold">ğŸ“ Kategoriler (${categories.length})</h2>
+                    <div class="space-y-2">
+                        ${categories.map(c => `
+                            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 flex items-center gap-3">
+                                <div class="text-2xl">${c.icon || 'ğŸ“'}</div>
+                                <div class="flex-1">
+                                    <div class="font-bold">${c.title}</div>
+                                    <div class="text-xs text-slate-500">${c.id} â€¢ SÄ±ra: ${c.sort_order || 0}</div>
+                                </div>
+                                <div class="text-xs text-indigo-400">${styles.filter(s => s.category === c.id).length} stil</div>
+                            </div>
+                        `).join('') || '<div class="text-center text-slate-500 py-8">Kategori yok</div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAnalytics() {
+            const totalJobs = jobs.length;
+            const completed = jobs.filter(j => j.status === 'completed').length;
+            const failed = jobs.filter(j => j.status === 'failed').length;
+            const successRate = totalJobs ? ((completed / totalJobs) * 100).toFixed(1) : 0;
+            const uniqueUsers = new Set(jobs.map(j => j.user_id)).size;
+
+            return `
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold">ğŸ“ˆ Analiz</h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                            <div class="text-2xl font-bold text-indigo-400">${totalJobs}</div>
+                            <div class="text-xs text-slate-500">Toplam Ä°ÅŸlem</div>
+                        </div>
+                        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                            <div class="text-2xl font-bold text-emerald-400">${successRate}%</div>
+                            <div class="text-xs text-slate-500">BaÅŸarÄ± OranÄ±</div>
+                        </div>
+                        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                            <div class="text-2xl font-bold text-purple-400">${uniqueUsers}</div>
+                            <div class="text-xs text-slate-500">Aktif KullanÄ±cÄ±</div>
+                        </div>
+                        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                            <div class="text-2xl font-bold text-red-400">${failed}</div>
+                            <div class="text-xs text-slate-500">BaÅŸarÄ±sÄ±z</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                        <h3 class="font-bold mb-3">ğŸ”¥ PopÃ¼ler Stiller</h3>
+                        <div class="space-y-2">
+                            ${Object.entries(jobs.reduce((acc, j) => { acc[j.style_id] = (acc[j.style_id] || 0) + 1; return acc; }, {}))
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map(([styleId, count]) => {
+                        const style = styles.find(s => s.style_id === styleId || s.id === styleId);
+                        return `
+                                        <div class="flex items-center justify-between p-2 bg-slate-700/50 rounded-lg">
+                                            <span class="text-sm">${style?.name || styleId.substring(0, 10)}</span>
+                                            <span class="text-xs text-indigo-400 font-bold">${count} kullanÄ±m</span>
+                                        </div>
+                                    `;
+                    }).join('') || '<div class="text-slate-500 text-sm">Veri yok</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCleanup() {
+            return `
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold">ğŸ—‘ï¸ Temizlik</h2>
+                    <div class="bg-slate-800 rounded-xl p-4 border border-red-500/30">
+                        <p class="text-sm text-slate-400 mb-4">Eski iÅŸlemleri ve dosyalarÄ± temizleyerek depolama alanÄ± kazanÄ±n.</p>
+                        <div class="space-y-2">
+                            <button onclick="handleCleanup(3)" class="w-full py-3 bg-red-500/20 text-red-400 rounded-xl font-medium">
+                                3 GÃ¼nden Eski
+                            </button>
+                            <button onclick="handleCleanup(7)" class="w-full py-3 bg-orange-500/20 text-orange-400 rounded-xl font-medium">
+                                7 GÃ¼nden Eski
+                            </button>
+                            <button onclick="handleCleanup(30)" class="w-full py-3 bg-amber-500/20 text-amber-400 rounded-xl font-medium">
+                                30 GÃ¼nden Eski
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMore() {
+            const menuItems = [
+                { id: 'reports', icon: 'ğŸš©', label: 'Raporlar', count: reports.length, color: 'red' },
+                { id: 'config', icon: 'âš™ï¸', label: 'Config', color: 'slate' },
+                { id: 'analytics', icon: 'ğŸ“ˆ', label: 'Analiz', color: 'indigo' },
+                { id: 'cleanup', icon: 'ğŸ—‘ï¸', label: 'Temizlik', color: 'orange' }
+            ];
+
+            return `
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold">â‹¯ Daha Fazla</h2>
+                    <div class="space-y-2">
+                        ${menuItems.map(m => `
+                            <button onclick="switchTab('${m.id}')" 
+                                class="w-full bg-slate-800 rounded-xl p-4 border border-slate-700 flex items-center gap-4 text-left pressable">
+                                <span class="text-2xl">${m.icon}</span>
+                                <span class="flex-1 font-medium">${m.label}</span>
+                                ${m.count ? `<span class="px-2 py-1 bg-${m.color}-500/20 text-${m.color}-400 rounded-full text-xs">${m.count}</span>` : ''}
+                                <span class="text-slate-500">â†’</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // === CLEANUP ACTION ===
+        async function handleCleanup(days) {
+            if (!confirm(`${days} gÃ¼nden eski iÅŸlemleri silmek istediÄŸinize emin misiniz? Bu iÅŸlem geri alÄ±namaz.`)) return;
+
+            const date = new Date();
+            date.setDate(date.getDate() - days);
+
+            const { data: oldJobs, error } = await sb.from('jobs')
+                .select('id, input_image_url, input_image2_url, result_image_url')
+                .lt('created_at', date.toISOString())
+                .limit(100);
+
+            if (error || !oldJobs?.length) {
+                toast(error ? 'Hata: ' + error.message : 'Silinecek iÅŸ bulunamadÄ±');
+                return;
+            }
+
+            const files = [];
+            const getPath = u => u?.split('/style-images/')[1] || null;
+            oldJobs.forEach(j => {
+                [j.input_image_url, j.input_image2_url, j.result_image_url].forEach(u => {
+                    const p = getPath(u);
+                    if (p) files.push(p);
+                });
+            });
+
+            if (files.length) {
+                await sb.storage.from('style-images').remove(files);
+            }
+            await sb.from('jobs').delete().in('id', oldJobs.map(j => j.id));
+
+            toast(oldJobs.length + ' is silindi');
+        }
+
+        // === USER DETAIL ===  
+        async function openUserDetail(userId) {
+            currentUserDetail = userId;
+            const { data: userJobs } = await sb.from('jobs')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(20);
+            currentUserJobs = userJobs || [];
+            renderApp();
+        }
+
+        function closeUserDetail() {
+            currentUserDetail = null;
+            currentUserJobs = [];
+            renderApp();
+        }
+
+        async function deleteUserJob(jobId) {
+            if (!confirm('Bu gÃ¶rseli silmek istediÄŸinize emin misiniz?')) return;
+            await sb.from('jobs').delete().eq('id', jobId);
+            toast('GÃ¶rsel silindi');
+            if (currentUserDetail) openUserDetail(currentUserDetail);
+        }
+
+        // === STYLE ACTIONS ===
+        async function deleteStyle(id) {
+            if (!confirm('Bu stili silmek istediÄŸinize emin misiniz?')) return;
+            await sb.from('styles').delete().eq('id', id);
+            await loadData();
+            renderApp();
+            toast('Stil silindi ğŸ—‘ï¸');
         }
 
         // === INIT ON LOAD ===
