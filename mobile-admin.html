@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Satriq Admin - Mobile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        body {
+            overscroll-behavior: none;
+        }
+
+        .tab-active {
+            color: #6366f1;
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .safe-bottom {
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+
+        .safe-top {
+            padding-top: max(0.5rem, env(safe-area-inset-top));
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        /* Pull to refresh indicator */
+        .pull-indicator {
+            transition: transform 0.2s;
+        }
+
+        /* Smooth transitions */
+        .tab-content {
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Card press effect */
+        .pressable:active {
+            transform: scale(0.98);
+            opacity: 0.9;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-white min-h-screen pb-20">
+    <div id="app" class="p-4 text-center min-h-screen flex items-center justify-center">
+        <div>
+            <div class="spinner text-4xl mb-4">⚙️</div>
+            <h1 class="text-xl font-bold text-indigo-400">Yükleniyor...</h1>
+        </div>
+    </div>
+
+    <script>
+        // === CONFIG ===
+        const SUPABASE_URL = 'https://xbcvrqsbjybkwdyvrirz.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhiY3ZycXNianlia3dkeXZyaXJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1OTc3MzIsImV4cCI6MjA4MDE3MzczMn0.LtnuuzPhcug-VY0Am2HinRmIltWoPI6LW8Gu-Pz2gb4';
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // === STATE ===
+        let currentUser = null;
+        let activeTab = 'dashboard';
+        let styles = [];
+        let categories = [];
+        let userStats = [];
+        let jobs = [];
+        let reports = [];
+        let appConfig = [];
+        let userSearchTerm = '';
+        let isLoading = false;
+
+        // === AUTH ===
+        async function checkIsAdmin(email) {
+            const { data, error } = await sb.from('admin_emails').select('email').eq('email', email).single();
+            return !error && data;
+        }
+
+        async function handleLogin(email, password) {
+            showLoading(true);
+            try {
+                const { data, error } = await sb.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+
+                const isAdmin = await checkIsAdmin(email);
+                if (!isAdmin) {
+                    await sb.auth.signOut();
+                    throw new Error('Bu hesap admin değil!');
+                }
+                init();
+            } catch (e) {
+                alert('Giriş hatası: ' + e.message);
+                showLoading(false);
+            }
+        }
+
+        async function handleLogout() {
+            await sb.auth.signOut();
+            currentUser = null;
+            renderLogin();
+        }
+
+        // === INIT ===
+        async function init() {
+            showLoading(true);
+            try {
+                const { data: { session } } = await sb.auth.getSession();
+                if (session) {
+                    currentUser = session.user;
+                    const isAdmin = await checkIsAdmin(currentUser.email);
+                    if (!isAdmin) {
+                        await sb.auth.signOut();
+                        renderLogin();
+                        return;
+                    }
+                    await loadData();
+                    renderApp();
+                } else {
+                    renderLogin();
+                }
+            } catch (e) {
+                alert('Başlatma hatası: ' + e.message);
+                renderLogin();
+            }
+            showLoading(false);
+        }
+
+        // === DATA LOADING ===
+        async function loadData() {
+            try {
+                // Load styles
+                const { data: stylesData } = await sb.from('styles').select('*').order('sort_order', { ascending: true });
+                styles = stylesData || [];
+
+                // Load categories
+                const { data: categoriesData } = await sb.from('categories').select('*').order('sort_order', { ascending: true });
+                categories = categoriesData || [];
+
+                // Load based on active tab
+                if (activeTab === 'users' || activeTab === 'dashboard') {
+                    await loadUserStats();
+                }
+                if (activeTab === 'reports') {
+                    await loadReports();
+                }
+                if (activeTab === 'analytics' || activeTab === 'dashboard') {
+                    await loadAnalytics();
+                }
+                if (activeTab === 'config') {
+                    await loadAppConfig();
+                }
+            } catch (e) {
+                console.error('Data load error:', e);
+            }
+        }
+
+        async function loadUserStats() {
+            try {
+                const { data, error } = await sb.rpc('admin_get_user_stats');
+                if (error) {
+                    // Fallback
+                    const { data: profiles } = await sb.from('profiles').select('*');
+                    const { data: allJobs } = await sb.from('jobs').select('user_id');
+                    const jobCounts = {};
+                    if (allJobs) allJobs.forEach(j => { jobCounts[j.user_id] = (jobCounts[j.user_id] || 0) + 1; });
+                    userStats = (profiles || []).map(p => ({
+                        user_id: p.id,
+                        email: p.email,
+                        job_count: jobCounts[p.id] || 0,
+                        credits: p.credits,
+                        created_at: p.created_at
+                    }));
+                } else {
+                    userStats = data || [];
+                    // Merge with profiles
+                    const { data: profiles } = await sb.from('profiles').select('*').limit(500);
+                    if (profiles) {
+                        const profileMap = {};
+                        profiles.forEach(p => { profileMap[p.id] = p; });
+                        userStats = userStats.map(u => ({
+                            ...u,
+                            email: profileMap[u.user_id]?.email || u.email,
+                            credits: profileMap[u.user_id]?.credits ?? u.credits,
+                            created_at: profileMap[u.user_id]?.created_at
+                        }));
+                        // Add users without jobs
+                        profiles.forEach(p => {
+                            if (!userStats.find(u => u.user_id === p.id)) {
+                                userStats.push({
+                                    user_id: p.id,
+                                    email: p.email,
+                                    credits: p.credits,
+                                    job_count: 0,
+                                    created_at: p.created_at
+                                });
+                            }
+                        });
+                    }
+                }
+                userStats.sort((a, b) => (b.job_count || 0) - (a.job_count || 0));
+            } catch (e) {
+                console.error('User stats error:', e);
+            }
+        }
+
+        async function loadAnalytics() {
+            try {
+                const { data } = await sb.rpc('get_admin_analytics_data', { limit_count: 500 });
+                jobs = data || [];
+            } catch (e) {
+                const { data } = await sb.from('jobs').select('id, style_id, user_id, created_at, status').order('created_at', { ascending: false }).limit(500);
+                jobs = data || [];
+            }
+        }
+
+        async function loadReports() {
+            const { data } = await sb.from('reports').select('*, jobs(*)').neq('status', 'resolved').order('created_at', { ascending: false });
+            reports = data || [];
+        }
+
+        async function loadAppConfig() {
+            const { data } = await sb.from('app_config').select('*').order('key');
+            appConfig = data || [];
+        }
+
+        // === UI HELPERS ===
+        function showLoading(show) {
+            isLoading = show;
+        }
+
+        function switchTab(tab) {
+            activeTab = tab;
+            showLoading(true);
+            loadData().then(() => {
+                renderApp();
+                showLoading(false);
+            });
+        }
+
+        function toast(msg) {
+            const t = document.createElement('div');
+            t.className = 'fixed top-4 left-4 right-4 bg-indigo-600 text-white p-3 rounded-xl text-sm font-medium text-center z-50 shadow-lg';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 2500);
+        }
+
+        // === ACTIONS ===
+        async function toggleCarousel(styleId, currentStatus) {
+            const featuredCount = styles.filter(s => s.featured_in_carousel).length;
+            if (!currentStatus && featuredCount >= 8) {
+                toast('⚠️ Max 8 stil carousel\'de olabilir!');
+                return;
+            }
+            await sb.from('styles').update({ featured_in_carousel: !currentStatus }).eq('id', styleId);
+            await loadData();
+            renderApp();
+            toast(currentStatus ? 'Carousel\'den çıkarıldı' : 'Carousel\'e eklendi ✨');
+        }
+
+        async function toggleTrending(styleId, currentStatus) {
+            await sb.from('styles').update({ is_trending: !currentStatus }).eq('id', styleId);
+            await loadData();
+            renderApp();
+            toast(currentStatus ? 'Trending kapatıldı' : 'Trending açıldı 🔥');
+        }
+
+        async function handleResolveReport(id) {
+            await sb.from('reports').update({ status: 'resolved' }).eq('id', id);
+            await loadReports();
+            renderApp();
+            toast('Rapor çözüldü ✓');
+        }
+
+        async function handleDeleteReportedJob(reportId, jobId) {
+            if (!confirm('Bu görseli ve raporu silmek istediğinize emin misiniz?')) return;
+            await sb.from('jobs').delete().eq('id', jobId);
+            await sb.from('reports').delete().eq('id', reportId);
+            await loadReports();
+            renderApp();
+            toast('Görsel silindi 🗑️');
+        }
+
+        async function handleQuickAddCredits(userId) {
+            const amount = prompt("Eklenecek kredi miktarı:", "50");
+            if (!amount) return;
+            const parsed = parseInt(amount);
+            if (isNaN(parsed) || parsed === 0) {
+                toast("Geçersiz miktar");
+                return;
+            }
+            try {
+                const { data, error } = await sb.rpc('admin_add_credits', { p_user_id: userId, p_amount: parsed });
+                if (error) throw error;
+                toast(`${parsed} kredi eklendi! Yeni: ${data}`);
+                await loadUserStats();
+                renderApp();
+            } catch (e) {
+                alert("Hata: " + e.message);
+            }
+        }
+
+        async function handleUpdateConfig(key, value) {
+            try {
+                await sb.from('app_config').update({ value }).eq('key', key);
+                toast('Config güncellendi ✓');
+            } catch (e) {
+                alert('Hata: ' + e.message);
+            }
+        }
+
+        // === RENDERERS ===
+        function renderLogin() {
+            document.getElementById('app').innerHTML = `
+                <div class="min-h-screen flex items-center justify-center p-6">
+                    <div class="w-full max-w-sm">
+                        <div class="text-center mb-8">
+                            <div class="text-5xl mb-4">🎨</div>
+                            <h1 class="text-2xl font-bold">Satriq<span class="text-indigo-400">Admin</span></h1>
+                            <p class="text-slate-500 text-sm mt-2">Mobil Yönetim Paneli</p>
+                        </div>
+                        <form onsubmit="event.preventDefault(); handleLogin(this.email.value, this.password.value);" class="space-y-4">
+                            <input type="email" name="email" placeholder="Email" required
+                                class="w-full px-4 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white text-lg focus:border-indigo-500 focus:outline-none">
+                            <input type="password" name="password" placeholder="Şifre" required
+                                class="w-full px-4 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white text-lg focus:border-indigo-500 focus:outline-none">
+                            <button type="submit" 
+                                class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl font-bold text-lg transition-colors">
+                                Giriş Yap
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderApp() {
+            const tabs = [
+                { id: 'dashboard', icon: '📊', label: 'Panel' },
+                { id: 'styles', icon: '🎨', label: 'Stiller' },
+                { id: 'users', icon: '👥', label: 'Users' },
+                { id: 'reports', icon: '🚩', label: 'Raporlar' },
+                { id: 'config', icon: '⚙️', label: 'Config' }
+            ];
+
+            document.getElementById('app').innerHTML = `
+                <!-- Header -->
+                <header class="fixed top-0 left-0 right-0 bg-slate-800/95 backdrop-blur border-b border-slate-700 z-40 safe-top">
+                    <div class="flex items-center justify-between px-4 py-3">
+                        <h1 class="text-lg font-bold">Satriq<span class="text-indigo-400">Admin</span></h1>
+                        <button onclick="handleLogout()" class="text-slate-400 hover:text-white text-sm px-3 py-1.5 rounded-lg bg-slate-700/50">
+                            Çıkış
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Content -->
+                <main class="pt-16 pb-24 px-4 tab-content">
+                    ${renderTabContent()}
+                </main>
+
+                <!-- Bottom Navigation -->
+                <nav class="fixed bottom-0 left-0 right-0 bg-slate-800/95 backdrop-blur border-t border-slate-700 z-40 safe-bottom">
+                    <div class="flex justify-around py-2">
+                        ${tabs.map(t => `
+                            <button onclick="switchTab('${t.id}')" 
+                                class="flex flex-col items-center py-2 px-4 rounded-xl transition-all ${activeTab === t.id ? 'tab-active' : 'text-slate-500'}">
+                                <span class="text-xl">${t.icon}</span>
+                                <span class="text-[10px] mt-1 font-medium">${t.label}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                </nav>
+            `;
+        }
+
+        function renderTabContent() {
+            switch (activeTab) {
+                case 'dashboard': return renderDashboard();
+                case 'styles': return renderStyles();
+                case 'users': return renderUsers();
+                case 'reports': return renderReports();
+                case 'config': return renderConfig();
+                default: return renderDashboard();
+            }
+        }
+
+        function renderDashboard() {
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            const todayJobs = jobs.filter(j => new Date(j.created_at) >= todayStart).length;
+            const totalUsers = userStats.length;
+            const activeUsers = userStats.filter(u => u.job_count > 0).length;
+            const totalCredits = userStats.reduce((sum, u) => sum + (u.credits || 0), 0);
+            const featuredCount = styles.filter(s => s.featured_in_carousel).length;
+
+            return `
+                <div class="space-y-4">
+                    <!-- Quick Stats Grid -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-gradient-to-br from-indigo-600 to-indigo-800 p-4 rounded-2xl">
+                            <div class="text-3xl font-bold">${todayJobs}</div>
+                            <div class="text-indigo-200 text-sm">Bugün İşlem</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-600 to-emerald-800 p-4 rounded-2xl">
+                            <div class="text-3xl font-bold">${totalUsers}</div>
+                            <div class="text-emerald-200 text-sm">Toplam Kullanıcı</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-amber-600 to-amber-800 p-4 rounded-2xl">
+                            <div class="text-3xl font-bold">${activeUsers}</div>
+                            <div class="text-amber-200 text-sm">Aktif Kullanıcı</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-600 to-purple-800 p-4 rounded-2xl">
+                            <div class="text-3xl font-bold">${styles.length}</div>
+                            <div class="text-purple-200 text-sm">Stil Sayısı</div>
+                        </div>
+                    </div>
+
+                    <!-- Carousel Status -->
+                    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-bold">✨ Carousel</h3>
+                            <span class="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-full">${featuredCount}/8</span>
+                        </div>
+                        <div class="flex gap-2 overflow-x-auto pb-2">
+                            ${styles.filter(s => s.featured_in_carousel).map(s => `
+                                <div class="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-slate-700">
+                                    ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center">🎨</div>`}
+                                </div>
+                            `).join('') || '<div class="text-slate-500 text-sm py-4">Carousel boş</div>'}
+                        </div>
+                    </div>
+
+                    <!-- Pending Reports -->
+                    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-bold">🚩 Bekleyen Raporlar</h3>
+                            <span class="text-xs ${reports.length > 0 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-400'} px-2 py-1 rounded-full">${reports.length}</span>
+                        </div>
+                        ${reports.length > 0
+                    ? `<button onclick="switchTab('reports')" class="w-full py-3 bg-red-500/10 text-red-400 rounded-xl font-medium">Raporları Gör →</button>`
+                    : `<div class="text-slate-500 text-sm">Bekleyen rapor yok ✓</div>`
+                }
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+                        <h3 class="font-bold mb-3">⚡ Son İşlemler</h3>
+                        <div class="space-y-2">
+                            ${jobs.slice(0, 5).map(j => {
+                    const style = styles.find(s => s.style_id === j.style_id || s.id === j.style_id);
+                    return `
+                                    <div class="flex items-center gap-3 p-2 bg-slate-700/50 rounded-xl">
+                                        <div class="w-10 h-10 rounded-lg bg-slate-600 overflow-hidden shrink-0">
+                                            ${style?.image_url ? `<img src="${style.image_url}" class="w-full h-full object-cover">` : '🎨'}
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-sm font-medium truncate">${style?.name || 'Bilinmeyen'}</div>
+                                            <div class="text-xs text-slate-500">${new Date(j.created_at).toLocaleString('tr-TR')}</div>
+                                        </div>
+                                        <div class="text-xs ${j.status === 'completed' ? 'text-emerald-400' : 'text-amber-400'}">${j.status === 'completed' ? '✓' : '...'}</div>
+                                    </div>
+                                `;
+                }).join('') || '<div class="text-slate-500 text-sm">Henüz işlem yok</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStyles() {
+            const featured = styles.filter(s => s.featured_in_carousel);
+
+            return `
+                <div class="space-y-4">
+                    <!-- Featured Section -->
+                    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-bold">✨ Carousel (${featured.length}/8)</h3>
+                        </div>
+                        <div class="flex gap-2 overflow-x-auto pb-2">
+                            ${featured.map(s => `
+                                <div class="shrink-0 relative pressable" onclick="toggleCarousel('${s.id}', true)">
+                                    <div class="w-20 h-20 rounded-xl overflow-hidden bg-slate-700 border-2 border-indigo-500">
+                                        ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-2xl">🎨</div>`}
+                                    </div>
+                                    <div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center">✕</div>
+                                </div>
+                            `).join('') || '<div class="text-slate-500 text-sm py-4 w-full text-center">Carousel boş - aşağıdan stil ekleyin</div>'}
+                        </div>
+                    </div>
+
+                    <!-- All Styles -->
+                    <h3 class="font-bold text-lg">Tüm Stiller (${styles.length})</h3>
+                    <div class="space-y-2">
+                        ${styles.map(s => `
+                            <div class="bg-slate-800 rounded-xl p-3 border border-slate-700 flex items-center gap-3 pressable">
+                                <div class="w-14 h-14 rounded-lg overflow-hidden bg-slate-700 shrink-0">
+                                    ${s.image_url ? `<img src="${s.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-xl">🎨</div>`}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium truncate">${s.name}</div>
+                                    <div class="text-xs text-slate-500">${s.category || 'Kategorisiz'}</div>
+                                </div>
+                                <div class="flex gap-1">
+                                    <button onclick="toggleCarousel('${s.id}', ${s.featured_in_carousel})" 
+                                        class="w-10 h-10 rounded-lg flex items-center justify-center text-lg ${s.featured_in_carousel ? 'bg-indigo-500' : 'bg-slate-700'}">
+                                        ✨
+                                    </button>
+                                    <button onclick="toggleTrending('${s.id}', ${s.is_trending})" 
+                                        class="w-10 h-10 rounded-lg flex items-center justify-center text-lg ${s.is_trending ? 'bg-orange-500' : 'bg-slate-700'}">
+                                        🔥
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderUsers() {
+            const filtered = userStats.filter(u => {
+                if (!userSearchTerm) return true;
+                const term = userSearchTerm.toLowerCase();
+                return (u.user_id || '').toLowerCase().includes(term) ||
+                    (u.email || '').toLowerCase().includes(term);
+            }).slice(0, 50);
+
+            return `
+                <div class="space-y-4">
+                    <!-- Search -->
+                    <div class="sticky top-16 z-30 bg-slate-900 pb-2">
+                        <input type="text" placeholder="Email veya ID ara..." 
+                            value="${userSearchTerm}"
+                            oninput="userSearchTerm = this.value; renderApp();"
+                            class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-indigo-500 focus:outline-none">
+                    </div>
+
+                    <!-- Stats Summary -->
+                    <div class="flex gap-2 text-center">
+                        <div class="flex-1 bg-slate-800 rounded-xl p-3 border border-slate-700">
+                            <div class="text-xl font-bold text-indigo-400">${userStats.length}</div>
+                            <div class="text-[10px] text-slate-500">Toplam</div>
+                        </div>
+                        <div class="flex-1 bg-slate-800 rounded-xl p-3 border border-slate-700">
+                            <div class="text-xl font-bold text-emerald-400">${userStats.filter(u => u.job_count > 0).length}</div>
+                            <div class="text-[10px] text-slate-500">Aktif</div>
+                        </div>
+                        <div class="flex-1 bg-slate-800 rounded-xl p-3 border border-slate-700">
+                            <div class="text-xl font-bold text-amber-400">${userStats.reduce((s, u) => s + (u.credits || 0), 0)}</div>
+                            <div class="text-[10px] text-slate-500">Kredi</div>
+                        </div>
+                    </div>
+
+                    <!-- User List -->
+                    <div class="space-y-2">
+                        ${filtered.map(u => `
+                            <div class="bg-slate-800 rounded-xl p-3 border border-slate-700">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-medium truncate">${u.email || 'Anonim'}</div>
+                                        <div class="text-[10px] text-slate-500 font-mono truncate">${u.user_id}</div>
+                                    </div>
+                                    <div class="flex gap-2 items-center shrink-0">
+                                        <div class="text-right">
+                                            <div class="text-emerald-400 font-bold">${u.credits || 0}</div>
+                                            <div class="text-[10px] text-slate-500">${u.job_count || 0} job</div>
+                                        </div>
+                                        <button onclick="handleQuickAddCredits('${u.user_id}')" 
+                                            class="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center text-lg font-bold">
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('') || '<div class="text-center text-slate-500 py-8">Kullanıcı bulunamadı</div>'}
+                    </div>
+
+                    ${filtered.length >= 50 ? '<div class="text-center text-slate-500 text-sm py-4">İlk 50 kullanıcı gösteriliyor. Aramayı daraltın.</div>' : ''}
+                </div>
+            `;
+        }
+
+        function renderReports() {
+            return `
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-bold">🚩 Raporlar</h2>
+                        <span class="text-xs ${reports.length > 0 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-400'} px-2 py-1 rounded-full">${reports.length} bekleyen</span>
+                    </div>
+
+                    ${reports.length === 0 ? `
+                        <div class="text-center py-12">
+                            <div class="text-5xl mb-4">✅</div>
+                            <div class="text-slate-400">Bekleyen rapor yok!</div>
+                        </div>
+                    ` : reports.map(r => `
+                        <div class="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
+                            <!-- Image -->
+                            ${r.jobs?.result_image_url ? `
+                                <div class="h-48 bg-slate-700">
+                                    <img src="${r.jobs.result_image_url}" class="w-full h-full object-contain" onclick="window.open('${r.jobs.result_image_url}', '_blank')">
+                                </div>
+                            ` : ''}
+                            
+                            <!-- Info -->
+                            <div class="p-4 space-y-3">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-400">Sebep:</span>
+                                    <span class="font-medium">${r.reason || 'Belirtilmemiş'}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-400">Tarih:</span>
+                                    <span>${new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div class="grid grid-cols-2 gap-2 pt-2">
+                                    <button onclick="handleResolveReport('${r.id}')" 
+                                        class="py-3 bg-emerald-500/20 text-emerald-400 rounded-xl font-medium">
+                                        ✓ Çözüldü
+                                    </button>
+                                    <button onclick="handleDeleteReportedJob('${r.id}', '${r.job_id}')" 
+                                        class="py-3 bg-red-500/20 text-red-400 rounded-xl font-medium">
+                                        🗑️ Sil
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderConfig() {
+            return `
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold">⚙️ Uygulama Ayarları</h2>
+
+                    ${appConfig.length === 0 ? `
+                        <div class="text-center py-8 text-slate-500">
+                            Config yükleniyor veya boş...
+                        </div>
+                    ` : appConfig.map(c => `
+                        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                            <div class="text-xs text-slate-500 mb-1 font-mono">${c.key}</div>
+                            <div class="flex gap-2">
+                                <input type="text" value="${c.value || ''}" 
+                                    id="config-${c.key}"
+                                    class="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:border-indigo-500 focus:outline-none">
+                                <button onclick="handleUpdateConfig('${c.key}', document.getElementById('config-${c.key}').value)" 
+                                    class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm">
+                                    Kaydet
+                                </button>
+                            </div>
+                            ${c.description ? `<div class="text-xs text-slate-500 mt-2">${c.description}</div>` : ''}
+                        </div>
+                    `).join('')}
+
+                    <!-- Quick Actions -->
+                    <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 mt-6">
+                        <h3 class="font-bold mb-3">🔧 Hızlı İşlemler</h3>
+                        <button onclick="location.reload()" 
+                            class="w-full py-3 bg-slate-700 text-white rounded-xl font-medium mb-2">
+                            🔄 Sayfayı Yenile
+                        </button>
+                        <button onclick="loadData().then(() => { renderApp(); toast('Veriler yenilendi!'); })" 
+                            class="w-full py-3 bg-indigo-500/20 text-indigo-400 rounded-xl font-medium">
+                            🔃 Verileri Yenile
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // === INIT ON LOAD ===
+        init();
+    </script>
+</body>
+
+</html>
